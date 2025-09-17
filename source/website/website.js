@@ -7,6 +7,8 @@ import { RGBColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { GetDefaultCamera } from '../engine/viewer/viewer.js';
 import { AddDiv, AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth, GetDomElementOuterHeight } from '../engine/viewer/domutils.js';
+
+import * as THREE from 'three';
 import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
 import { HandleEvent } from './eventhandler.js';
 import { HashHandler } from './hashhandler.js';
@@ -966,7 +968,6 @@ export class Website
         this.viewer.FlipUpVector();
     });
     */
-    // ---------------------------------------------------------------
         // Only one separator needed between side view and camera mode
         // AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
     // Removed Free Orbit button from the toolbar. The logic is preserved below for reference:
@@ -1270,3 +1271,217 @@ export class Website
         });
     }
 }
+
+// --- Slicer UI Overlay ---
+function initSlicerUI() {
+    window.slicerState = {
+        enabled: true,
+        invert: false,
+        value: 0
+    };
+    // Create overlay div
+    const slicerDiv = document.createElement('div');
+    slicerDiv.style.position = 'absolute';
+    slicerDiv.style.left = '50%';
+    slicerDiv.style.bottom = '32px';
+    slicerDiv.style.transform = 'translateX(-50%)';
+    slicerDiv.style.background = 'rgba(32,32,32,0.85)';
+    slicerDiv.style.padding = '12px 24px';
+    slicerDiv.style.borderRadius = '8px';
+    slicerDiv.style.zIndex = '1000';
+    slicerDiv.style.display = 'flex';
+    slicerDiv.style.alignItems = 'center';
+    slicerDiv.style.gap = '12px';
+    slicerDiv.setAttribute('aria-label', 'Model Slicer');
+
+    // Minimalist Toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'On';
+    toggleBtn.setAttribute('aria-label', 'Toggle slicer');
+    toggleBtn.style.borderRadius = '14px';
+    toggleBtn.style.padding = '4px 12px';
+    toggleBtn.style.border = 'none';
+    toggleBtn.style.background = '#222';
+    toggleBtn.style.color = '#fff';
+    toggleBtn.style.fontWeight = 'bold';
+    toggleBtn.style.fontSize = '13px';
+    toggleBtn.style.cursor = 'pointer';
+    toggleBtn.disabled = true;
+
+    // Minimalist Flip button
+    const flipBtn = document.createElement('button');
+    flipBtn.textContent = 'Flip';
+    flipBtn.setAttribute('aria-label', 'Flip slicing direction');
+    flipBtn.style.borderRadius = '14px';
+    flipBtn.style.padding = '4px 12px';
+    flipBtn.style.border = 'none';
+    flipBtn.style.background = '#222';
+    flipBtn.style.color = '#fff';
+    flipBtn.style.fontWeight = 'bold';
+    flipBtn.style.fontSize = '13px';
+    flipBtn.style.cursor = 'pointer';
+    flipBtn.disabled = true;
+
+    // Minimalist slider
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    slider.value = '0';
+    slider.setAttribute('aria-label', 'Slicer progress');
+    slider.style.width = '120px';
+    slider.style.height = '4px';
+    slider.style.background = '#444';
+    slider.disabled = true;
+    window.slicerSlider = slider;
+
+    // --- Slicer Logic ---
+    function getViewer() {
+        if (window.website && window.website.viewer) {
+            return window.website.viewer;
+        }
+        return null;
+    }
+    let clippingPlane = null;
+    function updateClippingPlane() {
+        const viewer = getViewer();
+        console.log('updateClippingPlane called', viewer);
+        if (!viewer || !viewer.camera) return;
+        if (!window.slicerState.enabled) {
+            viewer.renderer.localClippingEnabled = false;
+            viewer.renderer.clippingPlanes = [];
+            // Disable clipping on all materials
+            if (viewer.mainModel && viewer.mainModel.threeObject) {
+                viewer.mainModel.threeObject.traverse(obj => {
+                    if (obj.isMesh && obj.material) {
+                        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        mats.forEach(mat => {
+                            mat.clipShadows = false;
+                            mat.clippingPlanes = null;
+                            mat.needsUpdate = true;
+                        });
+                    }
+                });
+            }
+            viewer.Render && viewer.Render();
+            return;
+        }
+        // We'll compute a clipping plane and assign it to renderer and materials
+        // Get camera direction
+        const cam = viewer.camera;
+        const camDir = new THREE.Vector3();
+        cam.getWorldDirection(camDir);
+        if (window.slicerState.invert) camDir.negate();
+        // Get bounding box and compute min/max projection along camera axis using all 8 corners
+        const bbox = viewer.GetBoundingBox(() => true);
+        console.log('Bounding box:', bbox);
+        if (!bbox) return;
+        const min = bbox.min;
+        const max = bbox.max;
+        const corners = [
+            new THREE.Vector3(min.x, min.y, min.z),
+            new THREE.Vector3(min.x, min.y, max.z),
+            new THREE.Vector3(min.x, max.y, min.z),
+            new THREE.Vector3(min.x, max.y, max.z),
+            new THREE.Vector3(max.x, min.y, min.z),
+            new THREE.Vector3(max.x, min.y, max.z),
+            new THREE.Vector3(max.x, max.y, min.z),
+            new THREE.Vector3(max.x, max.y, max.z)
+        ];
+        let minProj = Number.POSITIVE_INFINITY;
+        let maxProj = Number.NEGATIVE_INFINITY;
+        corners.forEach(c => {
+            const p = c.dot(camDir);
+            if (p < minProj) minProj = p;
+            if (p > maxProj) maxProj = p;
+        });
+        // Interpolate along camera axis
+        const t = window.slicerState.value; // [0..1]
+        const planeDist = minProj + t * (maxProj - minProj);
+        // Offset by world origin
+        const center = new THREE.Vector3(
+            (min.x + max.x) / 2,
+            (min.y + max.y) / 2,
+            (min.z + max.z) / 2
+        );
+        const centerProj = center.dot(camDir);
+        const origin = center.clone().add(camDir.clone().multiplyScalar(planeDist - centerProj));
+        // Create/update plane
+        clippingPlane = new THREE.Plane();
+        clippingPlane.setFromNormalAndCoplanarPoint(camDir, origin);
+        viewer.renderer.localClippingEnabled = true;
+        viewer.renderer.clippingPlanes = [clippingPlane];
+
+        // Assign clipping plane to materials so shader uniforms get updated and force update
+        if (viewer.mainModel && viewer.mainModel.threeObject) {
+            viewer.mainModel.threeObject.traverse(obj => {
+                if (obj.isMesh && obj.material) {
+                    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                    mats.forEach(mat => {
+                        mat.clippingPlanes = [clippingPlane];
+                        mat.clipShadows = true;
+                        mat.needsUpdate = true;
+                    });
+                }
+            });
+        }
+
+        // Trigger a render so the change is visible immediately
+        viewer.Render && viewer.Render();
+        console.log('Clipping plane updated:', clippingPlane);
+    }
+
+    // Ensure slicer updates after model load
+    if (window.website) {
+        const origOnModelLoaded = window.website.OnModelLoaded;
+        window.website.OnModelLoaded = function(importResult, threeObject) {
+            if (origOnModelLoaded) origOnModelLoaded.call(this, importResult, threeObject);
+            // Enable slicer controls when a model is loaded
+            toggleBtn.disabled = false;
+            flipBtn.disabled = false;
+            slider.disabled = false;
+            setTimeout(updateClippingPlane, 100);
+        };
+    }
+
+    toggleBtn.onclick = () => {
+        window.slicerState.enabled = !window.slicerState.enabled;
+        toggleBtn.textContent = window.slicerState.enabled ? 'On' : 'Off';
+        updateClippingPlane();
+    };
+    flipBtn.onclick = () => {
+        window.slicerState.invert = !window.slicerState.invert;
+        updateClippingPlane();
+    };
+    slider.oninput = () => {
+        window.slicerState.value = parseInt(slider.value) / 100;
+        updateClippingPlane();
+    };
+    slider.onkeydown = (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            slider.value = Math.max(0, parseInt(slider.value) - 1);
+            window.slicerState.value = parseInt(slider.value) / 100;
+            updateClippingPlane();
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            slider.value = Math.min(100, parseInt(slider.value) + 1);
+            window.slicerState.value = parseInt(slider.value) / 100;
+            updateClippingPlane();
+        }
+    };
+
+    slicerDiv.appendChild(toggleBtn);
+    slicerDiv.appendChild(flipBtn);
+    slicerDiv.appendChild(slider);
+    slicerDiv.style.display = 'flex'; // Always visible
+    document.body.appendChild(slicerDiv);
+}
+
+function waitForWebsiteAndInitSlicer() {
+    if (window.website && window.website.viewer) {
+        initSlicerUI();
+    } else {
+        setTimeout(waitForWebsiteAndInitSlicer, 100);
+    }
+}
+
+window.addEventListener('load', waitForWebsiteAndInitSlicer);

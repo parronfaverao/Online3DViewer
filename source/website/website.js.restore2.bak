@@ -1,0 +1,38 @@
+// Restoration Point 2: Backup of website.js on 2025-09-17
+// You can restore by copying this file over website.js
+
+import { Coord3D } from '../engine/geometry/coord3d.js';
+import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
+import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
+import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
+import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
+import { RGBColor } from '../engine/model/color.js';
+import { Viewer } from '../engine/viewer/viewer.js';
+import { GetDefaultCamera } from '../engine/viewer/viewer.js';
+import { AddDiv, AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth, GetDomElementOuterHeight } from '../engine/viewer/domutils.js';
+import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
+import { HandleEvent } from './eventhandler.js';
+import { HashHandler } from './hashhandler.js';
+import { Navigator, Selection, SelectionType } from './navigator.js';
+import { CameraSettings, Settings, Theme } from './settings.js';
+import { Sidebar } from './sidebar.js';
+import { ThemeHandler } from './themehandler.js';
+import { ThreeModelLoaderUI } from './threemodelloaderui.js';
+import { Toolbar } from './toolbar.js';
+import { DownloadModel, ShowExportDialog } from './exportdialog.js';
+import { ShowSnapshotDialog } from './snapshotdialog.js';
+import { AddSvgIconElement, GetFilesFromDataTransfer, InstallTooltip, IsSmallWidth } from './utils.js';
+import { ShowOpenUrlDialog } from './openurldialog.js';
+import { ShowSharingDialog } from './sharingdialog.js';
+import { GetDefaultMaterials, ReplaceDefaultMaterialsColor } from '../engine/model/modelutils.js';
+import { Direction } from '../engine/geometry/geometry.js';
+import { CookieGetBoolVal, CookieSetBoolVal } from './cookiehandler.js';
+import { MeasureTool } from './measuretool.js';
+import { CloseAllDialogs } from './dialog.js';
+import { CreateVerticalSplitter } from './splitter.js';
+import { EnumeratePlugins, PluginType } from './pluginregistry.js';
+import { EnvironmentSettings } from '../engine/viewer/shadingmodel.js';
+import { IntersectionMode } from '../engine/viewer/viewermodel.js';
+import { Loc } from '../engine/core/localization.js';
+
+// ...existing code...

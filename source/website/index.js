@@ -78,6 +78,9 @@ export function StartWebsite ()
             fileInput : document.getElementById ('open_file')
         });
         website.Load ();
+
+        // Make website globally accessible for slicer logic
+        window.website = website;
     });
 }
 
@@ -91,3 +94,14 @@ export function StartEmbed ()
         embed.Load ();
     });
 }
+
+// Ensure OV global is available for index.html
+window.OV = {
+    SetWebsiteEventHandler,
+    RegisterHeaderPlugin,
+    RegisterToolbarPlugin,
+    StartWebsite,
+    StartEmbed,
+    UI,
+    Engine
+};
