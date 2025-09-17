@@ -9,14 +9,44 @@ export const NavigatorItemRecurse =
     All : 3
 };
 
-export class MaterialItem extends TreeViewSingleItem
+export class MaterialItem extends TreeViewButtonItem
 {
     constructor (name, materialIndex, callbacks)
     {
-        super (name);
+        super (name, 'materials');
+
+        this.materialIndex = materialIndex;
+        this.visible = true;
+
+        this.showHideButton = new TreeViewButton ('visible');
+        this.showHideButton.OnClick (() => {
+            callbacks.onShowHide (this.materialIndex);
+        });
+        this.AppendButton (this.showHideButton);
+
         this.OnClick (() => {
             callbacks.onSelected (materialIndex);
         });
+    }
+
+    GetMaterialIndex ()
+    {
+        return this.materialIndex;
+    }
+
+    IsVisible ()
+    {
+        return this.visible;
+    }
+
+    SetVisible (visible, recurse)
+    {
+        this.visible = visible;
+        if (this.visible) {
+            this.showHideButton.SetImage ('visible');
+        } else {
+            this.showHideButton.SetImage ('hidden');
+        }
     }
 }
 

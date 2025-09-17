@@ -27,6 +27,10 @@ export class Settings
             this.defaultColor = new RGBColor (200, 200, 200);
         }
         this.edgeSettings = new EdgeSettings (false, new RGBColor (0, 0, 0), 1);
+
+        // Unit conversion settings
+        this.unitScaleFactor = 1000.0;  // Scale factor for unit conversion
+        this.unitName = 'mm';        // Display unit name
     }
 
     LoadFromCookies ()
@@ -40,6 +44,8 @@ export class Settings
         this.edgeSettings.showEdges = CookieGetBoolVal ('ov_show_edges', false);
         this.edgeSettings.edgeColor = CookieGetRGBColorVal ('ov_edge_color', new RGBColor (0, 0, 0));
         this.edgeSettings.edgeThreshold = CookieGetIntVal ('ov_edge_threshold', 1);
+        this.unitScaleFactor = CookieGetFloatVal ('ov_unit_scale_factor', 1000.0);
+        this.unitName = CookieGetStringVal ('ov_unit_name', 'mm');
     }
 
     SaveToCookies ()
@@ -53,6 +59,8 @@ export class Settings
         CookieSetBoolVal ('ov_show_edges', this.edgeSettings.showEdges);
         CookieSetRGBColorVal ('ov_edge_color', this.edgeSettings.edgeColor);
         CookieSetIntVal ('ov_edge_threshold', this.edgeSettings.edgeThreshold);
+        CookieSetFloatVal ('ov_unit_scale_factor', this.unitScaleFactor);
+        CookieSetStringVal ('ov_unit_name', this.unitName);
     }
 }
 

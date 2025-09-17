@@ -139,3 +139,37 @@ div.ov_popup.sidebar
 {
 	width: 344px;
 }
+
+/* Unit converter input and select styles */
+input.ov_sidebar_parameter_input
+{
+	width: 100px;
+	padding: 3px 6px;
+	margin: 3px 10px 3px 0px;
+	border: 1px solid var(--ov_border_color);
+	border-radius: 3px;
+	background-color: var(--ov_background_color);
+	color: var(--ov_text_color);
+	float: left;
+}
+
+select.ov_sidebar_parameter_select
+{
+	width: 200px;
+	padding: 3px 6px;
+	margin: 3px 10px 3px 0px;
+	border: 1px solid var(--ov_border_color);
+	border-radius: 3px;
+	background-color: var(--ov_background_color);
+	color: var(--ov_text_color);
+	float: left;
+}
+
+div.ov_sidebar_parameter_description
+{
+	margin: 10px 0px;
+	font-size: 12px;
+	color: var(--ov_light_text_color);
+	line-height: 1.4;
+	clear: both;
+}

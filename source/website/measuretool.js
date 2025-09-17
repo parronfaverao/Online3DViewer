@@ -2,6 +2,7 @@ import { BigEps, IsEqualEps, RadDeg } from '../engine/geometry/geometry.js';
 import { AddDiv, ClearDomElement } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, IsDarkTextNeededForColor } from './utils.js';
 import { Loc } from '../engine/core/localization.js';
+import { Unit } from '../engine/model/unit.js';
 
 import * as THREE from 'three';
 import { ColorComponentToFloat, RGBColor } from '../engine/model/color.js';
@@ -73,33 +74,66 @@ class Marker
     }
 }
 
-function CalculateMarkerValues (aMarker, bMarker)
+function CalculateMarkerValues (aMarker, bMarker, model, settings)
 {
     const aIntersection = aMarker.GetIntersection ();
     const bIntersection = bMarker.GetIntersection ();
     let result = {
         pointsDistance : null,
+        xDistance : null,
+        yDistance : null,
+        zDistance : null,
         parallelFacesDistance : null,
         facesAngle : null
     };
 
     const aNormal = GetFaceWorldNormal (aIntersection);
     const bNormal = GetFaceWorldNormal (bIntersection);
+
+    // Calculate actual 3D distance
     result.pointsDistance = aIntersection.point.distanceTo (bIntersection.point);
-    result.facesAngle = aNormal.angleTo (bNormal);
+
+    // Calculate component distances along each axis
+    const deltaVector = new THREE.Vector3().subVectors(bIntersection.point, aIntersection.point);
+    result.xDistance = Math.abs(deltaVector.x);
+    result.yDistance = Math.abs(deltaVector.y);
+    result.zDistance = Math.abs(deltaVector.z);
+
+    // Apply same unit conversion logic as details panel
+    let unit = model ? model.GetUnit() : Unit.Millimeter; // Default to mm if no model
+    let scaleFactor = 1.0; // Start with no conversion
+
+    // First convert from model units to mm
+    if (unit === Unit.Meter) {
+        scaleFactor = 1000.0;
+    } else if (unit === Unit.Centimeter) {
+        scaleFactor = 10.0;
+    }
+    // Note: Unit.Millimeter uses scaleFactor = 1.0 (no conversion)
+
+    // Then apply user scale factor
+    if (settings && settings.unitScaleFactor) {
+        scaleFactor *= settings.unitScaleFactor;
+    }
+
+    result.pointsDistance *= scaleFactor;
+    result.xDistance *= scaleFactor;
+    result.yDistance *= scaleFactor;
+    result.zDistance *= scaleFactor;    result.facesAngle = aNormal.angleTo (bNormal);
     if (IsEqualEps (result.facesAngle, 0.0, BigEps) || IsEqualEps (result.facesAngle, Math.PI, BigEps)) {
         let aPlane = new THREE.Plane ().setFromNormalAndCoplanarPoint (aNormal, aIntersection.point);
-        result.parallelFacesDistance = Math.abs (aPlane.distanceToPoint (bIntersection.point));
+        result.parallelFacesDistance = Math.abs (aPlane.distanceToPoint (bIntersection.point)) * scaleFactor;
     }
     return result;
 }
 
 export class MeasureTool
 {
-    constructor (viewer, settings)
+    constructor (viewer, settings, getModel)
     {
         this.viewer = viewer;
         this.settings = settings;
+        this.getModel = getModel;
         this.isActive = false;
         this.markers = [];
         this.tempMarker = null;
@@ -289,17 +323,41 @@ export class MeasureTool
         } else if (this.markers.length === 1) {
             this.panel.innerHTML = Loc ('Select another point.');
         } else {
-            let calcResult = CalculateMarkerValues (this.markers[0], this.markers[1]);
+            let model = this.getModel ? this.getModel() : null;
+            let calcResult = CalculateMarkerValues (this.markers[0], this.markers[1], model, this.settings);
+            let unitName = this.settings.unitName || 'mm';
 
+            // Single line display with all measurements separated by "|"
+            // Order: Distance, Angle, X, Y, Z
             if (calcResult.pointsDistance !== null) {
-                AddValue (this.panel, 'measure_distance', 'Distance of points', calcResult.pointsDistance.toFixed (3));
+                AddValue (this.panel, 'measure_distance', '', calcResult.pointsDistance.toFixed (2) + ' ' + unitName);
             }
-            if (calcResult.parallelFacesDistance !== null) {
-                AddValue (this.panel, 'measure_distance_parallel', 'Distance of parallel faces', calcResult.parallelFacesDistance.toFixed (3));
-            }
+
             if (calcResult.facesAngle !== null) {
+                let separator1 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
                 let degreeValue = calcResult.facesAngle * RadDeg;
-                AddValue (this.panel, 'measure_angle', 'Angle of faces', degreeValue.toFixed (1) + '\xB0');
+                AddValue (this.panel, 'measure_angle', '', degreeValue.toFixed (1) + '\xB0');
+            }
+
+            if (calcResult.zDistance !== null) {
+                let separator2 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                AddDiv (this.panel, 'ov_measure_value', 'X: ' + calcResult.zDistance.toFixed (2) + ' ' + unitName);
+            }
+
+            if (calcResult.xDistance !== null) {
+                let separator3 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                AddDiv (this.panel, 'ov_measure_value', 'Y: ' + calcResult.xDistance.toFixed (2) + ' ' + unitName);
+            }
+
+            if (calcResult.yDistance !== null) {
+                let separator4 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                AddDiv (this.panel, 'ov_measure_value', 'Z: ' + calcResult.yDistance.toFixed (2) + ' ' + unitName);
+            }
+
+            // Other measurements (if needed)
+            if (calcResult.parallelFacesDistance !== null) {
+                let separator5 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                AddValue (this.panel, 'measure_distance_parallel', '', calcResult.parallelFacesDistance.toFixed (2) + ' ' + unitName);
             }
         }
         this.Resize ();

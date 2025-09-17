@@ -6,7 +6,7 @@ import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { GetDefaultCamera } from '../engine/viewer/viewer.js';
-import { AddDiv, AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth, GetDomElementOuterHeight } from '../engine/viewer/domutils.js';
+import { AddDiv, AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth, GetDomElementOuterHeight, IsDomElementVisible } from '../engine/viewer/domutils.js';
 
 import * as THREE from 'three';
 import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
@@ -195,7 +195,7 @@ export class Website
         this.settings = new Settings (Theme.Light);
         this.cameraSettings = new CameraSettings ();
         this.viewer = new Viewer ();
-        this.measureTool = new MeasureTool (this.viewer, this.settings);
+        this.measureTool = new MeasureTool (this.viewer, this.settings, () => this.model);
         this.hashHandler = new HashHandler ();
         this.toolbar = new Toolbar (this.parameters.toolbarDiv);
         this.navigator = new Navigator (this.parameters.navigatorDiv);
@@ -283,6 +283,16 @@ export class Website
         }
 
         this.layouter.Resize ();
+    }
+
+    SwitchToModelingView ()
+    {
+        // Switch to model view to show the navigator with JOBS folder files
+        this.SetUIState (WebsiteUIState.Model);
+
+        // Show panels and ensure Files panel is visible
+        this.navigator.ShowPanels (true);
+        this.navigator.panelSet.ShowPanel (this.navigator.filesPanel);
     }
 
     ClearModel ()
@@ -487,6 +497,16 @@ export class Website
         this.parameters.fileInput.click ();
     }
 
+    LoadJobsFile (jobsFile)
+    {
+        // Convert the File object to a FileList-like array
+        const files = [jobsFile.file];
+
+        // Load the model using existing method
+        HandleEvent ('model_load_started', 'jobs_folder');
+        this.LoadModelFromFileList (files);
+    }
+
     FitModelToWindow (onLoad)
     {
         let animation = !onLoad;
@@ -522,7 +542,23 @@ export class Website
     UpdateMeshesVisibility ()
     {
         this.viewer.SetMeshesVisibility ((meshUserData) => {
-            return this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id);
+            // First check if the mesh/part itself is visible (navigator state)
+            if (!this.navigator.IsMeshVisible (meshUserData.originalMeshInstance.id)) {
+                return false;
+            }
+
+            // Then check if at least one material is visible (if material visibility is active)
+            if (this.viewer._materialVisibility && this.viewer._materialVisibility.size > 0) {
+                for (let matIndex of meshUserData.originalMaterials) {
+                    if (this.viewer.IsMaterialVisible(matIndex)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // If no material visibility rules are active, default to visible
+            return true;
         });
     }
 
@@ -850,7 +886,7 @@ export class Website
                     let camera = { eye, center, up, fov };
                     this.viewer.SetCamera(camera);
                     if (this.viewer.SetUpVector) {
-                        this.viewer.SetUpVector(Direction.Z, false);
+                        this.viewer.SetUpVector(Direction.Y, false);
                     }
                     if (this.viewer.SetNavigationMode && this.cameraSettings) {
                         this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
@@ -1121,6 +1157,15 @@ export class Website
                 HandleEvent ('edge_display_changed', this.settings.showEdges ? 'on' : 'off');
                 this.UpdateEdgeDisplay ();
             },
+            onUnitSettingsChanged : () => {
+                this.settings.SaveToCookies ();
+                // Update the measurement tool panel if it's active
+                if (this.measureTool.IsActive ()) {
+                    this.measureTool.UpdatePanel ();
+                }
+                // Update the details panel if it's showing
+                this.sidebar.UpdateControlsStatus ();
+            },
             onZoomSpeedChanged : () => {
                 console.log('Website zoom speed callback triggered, new speed:', this.cameraSettings.zoomSpeed); // Debug log
                 this.cameraSettings.SaveToCookies ();
@@ -1158,6 +1203,23 @@ export class Website
                 }
             });
             return usedByMeshes;
+        }
+
+        function GetMaterialsFromVisibleMeshes (navigator, viewer, model)
+        {
+            let visibleMaterials = new Set ();
+            viewer.EnumerateMeshesAndLinesUserData ((meshUserData) => {
+                // Check if this mesh is visible in the navigator
+                if (navigator.IsMeshVisible (meshUserData.originalMeshInstance.id)) {
+                    // Add all materials used by this visible mesh
+                    if (meshUserData.originalMaterials) {
+                        for (let materialIndex of meshUserData.originalMaterials) {
+                            visibleMaterials.add (materialIndex);
+                        }
+                    }
+                }
+            });
+            return Array.from (visibleMaterials);
         }
 
         function GetMaterialReferenceInfo (model, materialIndex)
@@ -1200,6 +1262,15 @@ export class Website
             openFileBrowserDialog : () => {
                 this.OpenFileBrowserDialog ();
             },
+            onJobsFileSelected : (jobsFile) => {
+                this.LoadJobsFile (jobsFile);
+            },
+            onJobsFolderLoaded : () => {
+                this.SwitchToModelingView ();
+            },
+            onJobsFolderCleared : () => {
+                this.SetUIState (WebsiteUIState.Intro);
+            },
             fitMeshToWindow : (meshInstanceId) => {
                 this.FitMeshToWindow (meshInstanceId);
             },
@@ -1212,8 +1283,21 @@ export class Website
             getMaterialsForMesh : (meshInstanceId) => {
                 return GetMaterialsForMesh (this.viewer, this.model, meshInstanceId);
             },
+            getMaterialsFromVisibleMeshes : () => {
+                return GetMaterialsFromVisibleMeshes (this.navigator, this.viewer, this.model);
+            },
             onMeshVisibilityChanged : () => {
                 this.UpdateMeshesVisibility ();
+                this.navigator.RefreshMaterialsPanel ();
+            },
+            onMaterialVisibilityChanged : (materialIndex) => {
+                this.viewer.SetMaterialVisible (materialIndex, !this.viewer.IsMaterialVisible (materialIndex));
+                this.UpdateMeshesVisibility ();
+            },
+            onResetMaterialVisibility : () => {
+                this.viewer.ResetMaterialVisibility ();
+                this.navigator.ResetMaterialsVisibility ();
+                this.navigator.RefreshMaterialsPanel ();
             },
             onMeshSelectionChanged : () => {
                 this.UpdateMeshesSelection ();
@@ -1229,6 +1313,9 @@ export class Website
             },
             onMaterialSelected : (materialIndex) => {
                 this.sidebar.AddMaterialProperties (this.model.GetMaterial (materialIndex));
+            },
+            onMaterialShowHide : (materialIndex) => {
+                this.viewer.SetMaterialVisible (materialIndex, !this.viewer.IsMaterialVisible (materialIndex));
             },
             onResizeRequested : () => {
                 this.layouter.Resize ();

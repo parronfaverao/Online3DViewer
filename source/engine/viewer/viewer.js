@@ -443,6 +443,7 @@ export class Viewer
     {
         this.mainModel.Clear ();
         this.extraModel.Clear ();
+        this._materialVisibility = new Map();
         this.Render ();
     }
 
@@ -608,6 +609,30 @@ export class Viewer
         this.ResizeRenderer (originalSize.width, originalSize.height);
         this.renderer.setClearAlpha (clearAlpha);
         return url;
+    }
+
+    SetMaterialVisible (materialIndex, visible)
+    {
+        if (!this._materialVisibility) {
+            this._materialVisibility = new Map();
+        }
+        this._materialVisibility.set(materialIndex, visible);
+        // Don't update visibility here - let the website handle the combined logic
+    }
+
+    IsMaterialVisible (materialIndex)
+    {
+        if (!this._materialVisibility) {
+            return true; // Default to visible
+        }
+        return this._materialVisibility.get(materialIndex) !== false;
+    }
+
+    ResetMaterialVisibility ()
+    {
+        if (this._materialVisibility) {
+            this._materialVisibility.clear();
+        }
     }
 
     Destroy ()

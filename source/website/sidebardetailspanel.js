@@ -31,9 +31,10 @@ function UnitToString (unit)
 
 export class SidebarDetailsPanel extends SidebarPanel
 {
-    constructor (parentDiv)
+    constructor (parentDiv, settings)
     {
         super (parentDiv);
+        this.settings = settings;
     }
 
     GetName ()
@@ -65,16 +66,40 @@ export class SidebarDetailsPanel extends SidebarPanel
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
         let unit = model.GetUnit ();
-        const toMM = (val) => {
-            if (unit === Unit.Meter) return val * 1000.0;
-            if (unit === Unit.Centimeter) return val * 10.0;
-            return val;
+
+        // Apply unit conversion with scale factor
+        const toDisplayUnits = (val) => {
+            let convertedValue = val;
+            // First convert from model units to mm
+            if (unit === Unit.Meter) {
+                convertedValue = val * 1000.0;
+            } else if (unit === Unit.Centimeter) {
+                convertedValue = val * 10.0;
+            }
+            // Then apply user scale factor
+            if (this.settings && this.settings.unitScaleFactor) {
+                convertedValue *= this.settings.unitScaleFactor;
+            }
+            return convertedValue;
         };
-        const toMM3 = (val) => {
-            if (unit === Unit.Meter) return val * 1e9;
-            if (unit === Unit.Centimeter) return val * 1e3;
-            return val;
+
+        const toDisplayUnits3 = (val) => {
+            let convertedValue = val;
+            // First convert from model units to mm³
+            if (unit === Unit.Meter) {
+                convertedValue = val * 1e9;
+            } else if (unit === Unit.Centimeter) {
+                convertedValue = val * 1e3;
+            }
+            // Then apply user scale factor cubed for volume
+            if (this.settings && this.settings.unitScaleFactor) {
+                convertedValue *= Math.pow(this.settings.unitScaleFactor, 3);
+            }
+            return convertedValue;
         };
+
+        // Get unit name for display
+        let unitName = (this.settings && this.settings.unitName) ? this.settings.unitName : 'mm';
 
    // Display Group and Part name from node
         if (object3D && object3D.node) {
@@ -90,7 +115,19 @@ export class SidebarDetailsPanel extends SidebarPanel
             }
             if (partName) {
                 this.AddProperty(table, new Property(PropertyType.Text, '<b>' + Loc('Part name') + ':</b>', partName));
+            }
+
+            // Add material name if this is a mesh instance
+            if (object3D && object3D.mesh && object3D.GetId) {
+                const materialNames = this.GetMaterialNamesForMeshInstance(model, object3D);
+                if (materialNames.length > 0) {
+                    const materialText = materialNames.join(', ');
+                    this.AddProperty(table, new Property(PropertyType.Text, '<b>' + Loc('Material') + ':</b>', materialText));
+                }
                 // Add a blank row for spacing
+                AddDiv(table, 'ov_property_table_row', '\u00A0');
+            } else if (partName) {
+                // Add a blank row for spacing only if we had a part name but no material info
                 AddDiv(table, 'ov_property_table_row', '\u00A0');
             }
         }
@@ -98,15 +135,15 @@ export class SidebarDetailsPanel extends SidebarPanel
    // Display Dimensions
 
     // Sort and label dimensions as Length (largest), Thickness (smallest), Width (remaining)
-    let dims = [toMM(size.x*1000), toMM(size.y*1000), toMM(size.z*1000)];
+    let dims = [toDisplayUnits(size.x), toDisplayUnits(size.y), toDisplayUnits(size.z)];
     let sorted = [...dims].sort((a, b) => a - b);
     let thickness = sorted[0];
     let width = sorted[1];
     let length = sorted[2];
-    // Map original dims to labels
-    this.AddProperty(table, new Property(PropertyType.Number, Loc('L. (mm)'), length));
-    this.AddProperty(table, new Property(PropertyType.Number, Loc('W. (mm)'), width));
-    this.AddProperty(table, new Property(PropertyType.Number, Loc('T. (mm)'), thickness));
+    // Map original dims to labels with unit suffix
+    this.AddProperty(table, new Property(PropertyType.Text, Loc('Length'), length.toFixed(2) + ' ' + unitName));
+    this.AddProperty(table, new Property(PropertyType.Text, Loc('Width'), width.toFixed(2) + ' ' + unitName));
+    this.AddProperty(table, new Property(PropertyType.Text, Loc('Thickness'), thickness.toFixed(2) + ' ' + unitName));
 
 
 
@@ -123,6 +160,34 @@ export class SidebarDetailsPanel extends SidebarPanel
             }
         }
         this.Resize ();
+    }
+
+    GetMaterialNamesForMeshInstance (model, meshInstance)
+    {
+        let materialNames = [];
+        if (meshInstance && meshInstance.mesh) {
+            // Get unique material indices used by this mesh
+            let materialIndices = new Set();
+            const mesh = meshInstance.mesh;
+
+            // Iterate through triangles to collect material indices
+            for (let i = 0; i < mesh.TriangleCount(); i++) {
+                const triangle = mesh.GetTriangle(i);
+                if (triangle.mat !== null && triangle.mat !== undefined) {
+                    materialIndices.add(triangle.mat);
+                }
+            }
+
+            // Convert material indices to material names
+            for (let materialIndex of materialIndices) {
+                if (materialIndex < model.MaterialCount()) {
+                    const material = model.GetMaterial(materialIndex);
+                    const materialName = material.name || `Material ${materialIndex}`;
+                    materialNames.push(materialName);
+                }
+            }
+        }
+        return materialNames.sort();
     }
 
     AddMaterialProperties (material)

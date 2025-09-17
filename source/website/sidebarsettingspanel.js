@@ -503,6 +503,89 @@ class SettingsImportParametersSection extends SettingsSection
     }
 }
 
+class SettingsUnitConverterSection extends SettingsSection
+{
+    constructor (parentDiv, settings)
+    {
+        super (parentDiv, Loc ('Unit Converter'), settings);
+        this.scaleFactorInput = null;
+        this.unitSelect = null;
+    }
+
+    Init (callbacks)
+    {
+        super.Init (callbacks);
+
+        // Scale factor input
+        let scaleFactorDiv = AddDiv (this.contentDiv, 'ov_sidebar_parameter');
+        AddDiv (scaleFactorDiv, null, Loc ('Scale Factor'));
+        this.scaleFactorInput = AddDomElement (scaleFactorDiv, 'input', 'ov_sidebar_parameter_input');
+        this.scaleFactorInput.setAttribute ('type', 'number');
+        this.scaleFactorInput.setAttribute ('step', '0.1');
+        this.scaleFactorInput.setAttribute ('min', '0.001');
+        this.scaleFactorInput.setAttribute ('max', '10000');
+        this.scaleFactorInput.value = this.settings.unitScaleFactor;
+        this.scaleFactorInput.addEventListener ('change', () => {
+            let newValue = parseFloat (this.scaleFactorInput.value);
+            if (!isNaN (newValue) && newValue > 0) {
+                this.settings.unitScaleFactor = newValue;
+                this.settings.SaveToCookies ();
+                this.callbacks.onUnitSettingsChanged ();
+            } else {
+                this.scaleFactorInput.value = this.settings.unitScaleFactor;
+            }
+        });
+
+        // Unit name selector
+        let unitDiv = AddDiv (this.contentDiv, 'ov_sidebar_parameter');
+        AddDiv (unitDiv, null, Loc ('Unit'));
+        this.unitSelect = AddDomElement (unitDiv, 'select', 'ov_sidebar_parameter_select');
+
+        let units = [
+            { value: 'mm', text: 'Millimeters (mm)' },
+            { value: 'cm', text: 'Centimeters (cm)' },
+            { value: 'm', text: 'Meters (m)' },
+            { value: 'in', text: 'Inches (in)' },
+            { value: 'ft', text: 'Feet (ft)' },
+            { value: 'units', text: 'Generic Units' }
+        ];
+
+        for (let unit of units) {
+            let option = AddDomElement (this.unitSelect, 'option');
+            option.value = unit.value;
+            option.text = unit.text;
+            if (unit.value === this.settings.unitName) {
+                option.selected = true;
+            }
+        }
+
+        this.unitSelect.addEventListener ('change', () => {
+            this.settings.unitName = this.unitSelect.value;
+            this.settings.SaveToCookies ();
+            this.callbacks.onUnitSettingsChanged ();
+        });
+
+        // Add helpful description
+        let descDiv = AddDiv (this.contentDiv, 'ov_sidebar_parameter_description');
+        descDiv.innerHTML = Loc ('Adjust the scale factor and unit to match your model. Example: If your model shows 200 units but should be 2000mm, set scale factor to 10.');
+    }
+
+    Update ()
+    {
+        if (this.scaleFactorInput !== null) {
+            this.scaleFactorInput.value = this.settings.unitScaleFactor;
+        }
+        if (this.unitSelect !== null) {
+            this.unitSelect.value = this.settings.unitName;
+        }
+    }
+
+    Clear ()
+    {
+        // No special cleanup needed
+    }
+}
+
 export class SidebarSettingsPanel extends SidebarPanel
 {
     constructor (parentDiv, settings, cameraSettings)
@@ -515,6 +598,7 @@ export class SidebarSettingsPanel extends SidebarPanel
         this.cameraSection = new SettingsCameraSection (this.sectionsDiv, this.cameraSettings);
         this.modelDisplaySection = new SettingsModelDisplaySection (this.sectionsDiv, this.settings);
         this.importParametersSection = new SettingsImportParametersSection (this.sectionsDiv, this.settings);
+        this.unitConverterSection = new SettingsUnitConverterSection (this.sectionsDiv, this.settings);
 
         this.resetToDefaultsButton = AddDiv (this.contentDiv, 'ov_button ov_panel_button outline', 'Reset to Default');
         this.resetToDefaultsButton.addEventListener ('click', () => {
@@ -542,6 +626,7 @@ export class SidebarSettingsPanel extends SidebarPanel
         this.cameraSection.Clear ();
         this.modelDisplaySection.Clear ();
         this.importParametersSection.Clear ();
+        this.unitConverterSection.Clear ();
     }
 
     Init (callbacks)
@@ -586,12 +671,20 @@ export class SidebarSettingsPanel extends SidebarPanel
                 this.callbacks.onDefaultColorChanged ();
             }
         });
+        this.unitConverterSection.Init ({
+            onUnitSettingsChanged : () => {
+                if (this.callbacks.onUnitSettingsChanged) {
+                    this.callbacks.onUnitSettingsChanged ();
+                }
+            }
+        });
     }
 
     UpdateControlsStatus ()
     {
         this.modelDisplaySection.Update ();
         this.importParametersSection.Update ();
+        this.unitConverterSection.Update ();
     }
 
     UpdateControlsVisibility ()
@@ -612,8 +705,13 @@ export class SidebarSettingsPanel extends SidebarPanel
         this.settings.defaultColor = defaultSettings.defaultColor;
         this.settings.edgeSettings = defaultSettings.edgeSettings;
         this.settings.themeId = defaultSettings.themeId;
+        this.settings.unitScaleFactor = defaultSettings.unitScaleFactor;
+        this.settings.unitName = defaultSettings.unitName;
         this.UpdateControlsStatus ();
         this.callbacks.onEnvironmentMapChanged ();
+        if (this.callbacks.onUnitSettingsChanged) {
+            this.callbacks.onUnitSettingsChanged ();
+        }
     }
 
     Resize ()

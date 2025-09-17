@@ -142,7 +142,7 @@ export class ProgressDialog extends Dialog
         let contentDiv = this.GetContentDiv ();
         contentDiv.classList.add ('ov_progress');
 
-    AddDiv (contentDiv, 'ov_progress_img', '<img src="assets/images/infocus_design_logo.png" alt="Infocus Design Logo" style="height:64px;" />');
+    AddDiv (contentDiv, 'ov_progress_img', '<img src="assets/images/3dviewer_net_logo.svg" alt="Online 3D Viewer" />');
         this.textDiv = AddDiv (contentDiv, 'ov_progress_text');
         this.SetText (text);
     }

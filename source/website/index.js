@@ -79,6 +79,19 @@ export function StartWebsite ()
         });
         website.Load ();
 
+        // Wire up intro screen buttons
+        document.getElementById ('intro_jobs_folder_button').addEventListener ('click', () => {
+            if (website.navigator && website.navigator.filesPanel && website.navigator.filesPanel.SelectJobsFolder) {
+                website.navigator.filesPanel.SelectJobsFolder ();
+                // Show the Files panel when JOBS folder button is clicked
+                website.navigator.panelSet.ShowPanel (website.navigator.filesPanel);
+            }
+        });
+
+        document.getElementById ('intro_open_file_button').addEventListener ('click', () => {
+            website.OpenFileBrowserDialog ();
+        });
+
         // Make website globally accessible for slicer logic
         window.website = website;
     });

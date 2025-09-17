@@ -84,12 +84,33 @@ export class Navigator
         this.filesPanel.Init ({
             onFileBrowseButtonClicked : () => {
                 this.callbacks.openFileBrowserDialog ();
+            },
+            onJobsFileSelected : (jobsFile) => {
+                if (this.callbacks.onJobsFileSelected) {
+                    this.callbacks.onJobsFileSelected (jobsFile);
+                }
+            },
+            onJobsFolderLoaded : () => {
+                if (this.callbacks.onJobsFolderLoaded) {
+                    this.callbacks.onJobsFolderLoaded ();
+                }
+            },
+            onJobsFolderCleared : () => {
+                if (this.callbacks.onJobsFolderCleared) {
+                    this.callbacks.onJobsFolderCleared ();
+                }
             }
         });
 
         this.materialsPanel.Init ({
             onMaterialSelected : (materialIndex) => {
                 this.SetSelection (new Selection (SelectionType.Material, materialIndex));
+            },
+            onMaterialShowHide : (materialIndex) => {
+                this.ToggleMaterialVisibility (materialIndex);
+            },
+            getMaterialsFromVisibleMeshes : () => {
+                return this.callbacks.getMaterialsFromVisibleMeshes ();
             },
             onMeshTemporarySelected : (meshInstanceId) => {
                 this.tempSelectedMeshId = meshInstanceId;
@@ -143,6 +164,7 @@ export class Navigator
 
     FillTree (importResult)
     {
+        this.importResult = importResult;
         this.filesPanel.Fill (importResult);
         if (importResult.missingFiles.length === 0) {
             this.panelSet.SetPanelIcon (this.filesPanel, 'files');
@@ -172,7 +194,28 @@ export class Navigator
     ShowAllMeshes (show)
     {
         this.meshesPanel.ShowAllMeshes (show);
+        if (show) {
+            // When showing all meshes, also reset material visibility to show all materials
+            this.callbacks.onResetMaterialVisibility ();
+        }
         this.callbacks.onMeshVisibilityChanged ();
+    }
+
+    ShowAllMaterials (show)
+    {
+        this.materialsPanel.ShowAllMaterials (show);
+    }
+
+    RefreshMaterialsPanel ()
+    {
+        if (this.importResult) {
+            this.materialsPanel.RefreshVisibleMaterials (this.importResult);
+        }
+    }
+
+    ResetMaterialsVisibility ()
+    {
+        this.materialsPanel.ResetAllMaterialsVisibility ();
     }
 
     ToggleNodeVisibility (nodeId)
@@ -187,6 +230,12 @@ export class Navigator
         if (!suppressRender) {
             this.callbacks.onMeshVisibilityChanged();
         }
+    }
+
+    ToggleMaterialVisibility (materialIndex)
+    {
+        this.materialsPanel.ToggleMaterialVisibility(materialIndex);
+        this.callbacks.onMaterialVisibilityChanged(materialIndex);
     }
 
     IsMeshIsolated (meshInstanceId)

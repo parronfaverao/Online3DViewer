@@ -10,7 +10,7 @@ export class Sidebar
         this.mainDiv = mainDiv;
         this.panelSet = new PanelSet (mainDiv);
 
-        this.detailsPanel = new SidebarDetailsPanel (this.panelSet.GetContentDiv ());
+        this.detailsPanel = new SidebarDetailsPanel (this.panelSet.GetContentDiv (), settings);
         this.settingsPanel = new SidebarSettingsPanel (this.panelSet.GetContentDiv (), settings, cameraSettings);
 
         this.panelSet.AddPanel (this.detailsPanel);
@@ -62,6 +62,11 @@ export class Sidebar
             },
             onEdgeDisplayChanged : () => {
                 this.callbacks.onEdgeDisplayChanged ();
+            },
+            onUnitSettingsChanged : () => {
+                if (this.callbacks.onUnitSettingsChanged) {
+                    this.callbacks.onUnitSettingsChanged ();
+                }
             }
         });
     }
