@@ -327,37 +327,74 @@ export class MeasureTool
             let calcResult = CalculateMarkerValues (this.markers[0], this.markers[1], model, this.settings);
             let unitName = this.settings.unitName || 'mm';
 
-            // Single line display with all measurements separated by "|"
-            // Order: Distance, Angle, X, Y, Z
-            if (calcResult.pointsDistance !== null) {
-                AddValue (this.panel, 'measure_distance', '', calcResult.pointsDistance.toFixed (2) + ' ' + unitName);
-            }
+            // Check if we're in portrait mode (height > width)
+            let isPortraitMode = window.innerHeight > window.innerWidth;
 
-            if (calcResult.facesAngle !== null) {
-                let separator1 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
-                let degreeValue = calcResult.facesAngle * RadDeg;
-                AddValue (this.panel, 'measure_angle', '', degreeValue.toFixed (1) + '\xB0');
-            }
+            if (isPortraitMode) {
+                // Portrait mode: Display as two lines
+                // Line 1: Distance | Angle
+                let line1 = AddDiv (this.panel, 'ov_measure_line', '');
 
-            if (calcResult.zDistance !== null) {
-                let separator2 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
-                AddDiv (this.panel, 'ov_measure_value', 'X: ' + calcResult.zDistance.toFixed (2) + ' ' + unitName);
-            }
+                if (calcResult.pointsDistance !== null) {
+                    AddValue (line1, 'measure_distance', '', calcResult.pointsDistance.toFixed (2) + ' ' + unitName);
+                }
 
-            if (calcResult.xDistance !== null) {
-                let separator3 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
-                AddDiv (this.panel, 'ov_measure_value', 'Y: ' + calcResult.xDistance.toFixed (2) + ' ' + unitName);
-            }
+                if (calcResult.facesAngle !== null) {
+                    let separator1 = AddDiv (line1, 'ov_measure_separator', ' | ');
+                    let degreeValue = calcResult.facesAngle * RadDeg;
+                    AddValue (line1, 'measure_angle', '', degreeValue.toFixed (1) + '\xB0');
+                }
 
-            if (calcResult.yDistance !== null) {
-                let separator4 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
-                AddDiv (this.panel, 'ov_measure_value', 'Z: ' + calcResult.yDistance.toFixed (2) + ' ' + unitName);
-            }
+                // Line 2: X | Y | Z
+                let line2 = AddDiv (this.panel, 'ov_measure_line', '');
+                let hasXYZ = false;
 
-            // Other measurements (if needed)
-            if (calcResult.parallelFacesDistance !== null) {
-                let separator5 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
-                AddValue (this.panel, 'measure_distance_parallel', '', calcResult.parallelFacesDistance.toFixed (2) + ' ' + unitName);
+                if (calcResult.zDistance !== null) {
+                    AddDiv (line2, 'ov_measure_value', 'X: ' + calcResult.zDistance.toFixed (2) + ' ' + unitName);
+                    hasXYZ = true;
+                }
+
+                if (calcResult.xDistance !== null) {
+                    if (hasXYZ) {
+                        AddDiv (line2, 'ov_measure_separator', ' | ');
+                    }
+                    AddDiv (line2, 'ov_measure_value', 'Y: ' + calcResult.xDistance.toFixed (2) + ' ' + unitName);
+                    hasXYZ = true;
+                }
+
+                if (calcResult.yDistance !== null) {
+                    if (hasXYZ) {
+                        AddDiv (line2, 'ov_measure_separator', ' | ');
+                    }
+                    AddDiv (line2, 'ov_measure_value', 'Z: ' + calcResult.yDistance.toFixed (2) + ' ' + unitName);
+                }
+            } else {
+                // Landscape mode: Single line display with all measurements separated by "|"
+                // Order: Distance, Angle, X, Y, Z
+                if (calcResult.pointsDistance !== null) {
+                    AddValue (this.panel, 'measure_distance', '', calcResult.pointsDistance.toFixed (2) + ' ' + unitName);
+                }
+
+                if (calcResult.facesAngle !== null) {
+                    let separator1 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                    let degreeValue = calcResult.facesAngle * RadDeg;
+                    AddValue (this.panel, 'measure_angle', '', degreeValue.toFixed (1) + '\xB0');
+                }
+
+                if (calcResult.zDistance !== null) {
+                    let separator2 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                    AddDiv (this.panel, 'ov_measure_value', 'X: ' + calcResult.zDistance.toFixed (2) + ' ' + unitName);
+                }
+
+                if (calcResult.xDistance !== null) {
+                    let separator3 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                    AddDiv (this.panel, 'ov_measure_value', 'Y: ' + calcResult.xDistance.toFixed (2) + ' ' + unitName);
+                }
+
+                if (calcResult.yDistance !== null) {
+                    let separator4 = AddDiv (this.panel, 'ov_measure_separator', ' | ');
+                    AddDiv (this.panel, 'ov_measure_value', 'Z: ' + calcResult.yDistance.toFixed (2) + ' ' + unitName);
+                }
             }
         }
         this.Resize ();

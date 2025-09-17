@@ -76,3 +76,17 @@ a:hover
 }
 
 }
+
+/* Override hiding for landscape orientation - show all panels */
+@media (orientation: landscape) {
+	.only_full_width {
+		display: block !important;
+	}
+}
+
+/* Show measure tool in portrait mode even when other only_full_width elements are hidden */
+@media (max-width: 800px) {
+	#measure-tool-button {
+		display: inline-block !important;
+	}
+}

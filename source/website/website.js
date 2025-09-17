@@ -1035,6 +1035,7 @@ export class Website
             this.navigator.SetSelection (null);
             this.measureTool.SetActive (isSelected);
         });
+        measureToolButton.buttonDiv.id = 'measure-tool-button';
         this.measureTool.SetButton (measureToolButton);
         // --- Download and Export buttons removed by request on 2025-09-17 ---
         /*

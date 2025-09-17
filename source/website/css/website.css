@@ -410,25 +410,33 @@ div.ov_measure_panel
 	border-radius: 30px;
 	left : 0px;
 	top : 0px;
+	text-align: center;
 }
 
 div.ov_measure_panel div.ov_svg_icon
 {
 	color: inherit;
-	margin-bottom: 2px;
+	margin-bottom: 0px;
+	margin-right: 4px;
+	margin-top: 0px !important;
+	display: inline-block !important;
+	vertical-align: middle;
+	float: none !important;
 }
 
 div.ov_measure_panel div.ov_measure_value
 {
-	float: left;
+	display: inline-block;
 	margin-right: 10px;
+	vertical-align: middle;
 }
 
 div.ov_measure_panel div.ov_measure_separator
 {
-	float: left;
+	display: inline-block;
 	margin: 0 2px;
 	color: inherit;
+	vertical-align: middle;
 }
 
 div.ov_measure_panel div.ov_measure_top_group
@@ -449,6 +457,22 @@ div.ov_measure_panel div.ov_measure_axis_group div.ov_measure_value
 	margin-right: 8px;
 	font-weight: bold;
 	font-size: 0.9em;
+}
+
+div.ov_measure_panel div.ov_measure_line
+{
+	clear: both;
+	margin-bottom: 2px;
+	display: block;
+	width: 100%;
+	text-align: center;
+}
+
+/* Hide icons on small screens (both portrait and landscape) */
+@media (max-width: 800px) {
+	div.ov_measure_panel div.ov_svg_icon {
+		display: none !important;
+	}
 }
 
 @media (hover)
@@ -554,7 +578,9 @@ div.ov_toolbar div.ov_toolbar_button:hover
 }
 
  
- /* Responsive logo sizing for different screen sizes */
+ }
+
+/* Responsive logo sizing for different screen sizes */
 @media (max-width: 1200px) {
     div.intro svg.intro_logo,
     div.intro img.intro_logo {
@@ -592,5 +618,50 @@ div.ov_toolbar div.ov_toolbar_button:hover
     div.intro img.intro_logo {
         width: 160px;
         height: 33px;
+    }
+}
+
+/* Landscape layout adjustments for small screens */
+@media (max-width: 800px) and (orientation: landscape) {
+    div.main_sidebar {
+        width: 250px;
+        margin: 5px 0px;
+    }
+
+    div.main_right_container {
+        min-width: 250px;
+    }
+
+    div.main_left_container {
+        margin-right: 260px;
+    }
+}
+
+@media (max-width: 600px) and (orientation: landscape) {
+    div.main_sidebar {
+        width: 200px;
+        margin: 5px 0px;
+    }
+
+    div.main_right_container {
+        min-width: 200px;
+    }
+
+    div.main_left_container {
+        margin-right: 210px;
+    }
+}
+
+/* Portrait orientation - hide file name header */
+@media (orientation: portrait) {
+    div.main_file_name {
+        display: none !important;
+    }
+}
+
+/* Landscape orientation - hide file name header */
+@media (orientation: landscape) {
+    div.main_file_name {
+        display: none !important;
     }
 }
