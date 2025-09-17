@@ -199,7 +199,7 @@ export class Website
         this.hashHandler = new HashHandler ();
         this.toolbar = new Toolbar (this.parameters.toolbarDiv);
         this.navigator = new Navigator (this.parameters.navigatorDiv);
-        this.sidebar = new Sidebar (this.parameters.sidebarDiv, this.settings);
+        this.sidebar = new Sidebar (this.parameters.sidebarDiv, this.settings, this.cameraSettings);
         this.modelLoaderUI = new ThreeModelLoaderUI ();
         this.themeHandler = new ThemeHandler ();
         this.highlightColor = new RGBColor (142, 201, 240);
@@ -663,6 +663,7 @@ export class Website
         this.viewer.SetBackgroundColor (this.settings.backgroundColor);
         this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
         this.viewer.SetProjectionMode (this.cameraSettings.projectionMode);
+        this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed);
         this.UpdateEnvironmentMap ();
 
         // Add long touch support for context menu (right-click) on touch devices
@@ -1120,6 +1121,11 @@ export class Website
                 HandleEvent ('edge_display_changed', this.settings.showEdges ? 'on' : 'off');
                 this.UpdateEdgeDisplay ();
             },
+            onZoomSpeedChanged : () => {
+                console.log('Website zoom speed callback triggered, new speed:', this.cameraSettings.zoomSpeed); // Debug log
+                this.cameraSettings.SaveToCookies ();
+                this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed);
+            },
             onResizeRequested : () => {
                 this.layouter.Resize ();
             },
@@ -1469,8 +1475,8 @@ function initSlicerUI() {
         }
     };
 
-    slicerDiv.appendChild(toggleBtn);
-    slicerDiv.appendChild(flipBtn);
+    // slicerDiv.appendChild(toggleBtn);  // Hidden by request
+    // slicerDiv.appendChild(flipBtn);    // Hidden by request
     slicerDiv.appendChild(slider);
     slicerDiv.style.display = 'flex'; // Always visible
     document.body.appendChild(slicerDiv);

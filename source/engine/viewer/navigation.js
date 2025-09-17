@@ -1,5 +1,5 @@
 import { Coord2D, CoordDistance2D, SubCoord2D } from '../geometry/coord2d.js';
-import { CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D } from '../geometry/coord3d.js';
+import { CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D, AddCoord3D } from '../geometry/coord3d.js';
 import { DegRad, IsGreater, IsLower, IsZero } from '../geometry/geometry.js';
 import { ParabolicTweenFunction, TweenCoord3D } from '../geometry/tween.js';
 import { CameraIsEqual3D, NavigationMode } from './camera.js';
@@ -242,6 +242,8 @@ export class Navigation
 		this.camera = camera;
 		this.callbacks = callbacks;
 		this.navigationMode = NavigationMode.FixedUpVector;
+		this.zoomSpeedMultiplier = 1.0;
+		this.updateRequested = false; // For requestAnimationFrame optimization
 
 		this.mouse = new MouseInteraction ();
 		this.touch = new TouchInteraction ();
@@ -253,9 +255,9 @@ export class Navigation
 
 		if (this.canvas.addEventListener) {
 			this.canvas.addEventListener ('mousedown', this.OnMouseDown.bind (this));
-			this.canvas.addEventListener ('wheel', this.OnMouseWheel.bind (this));
-			this.canvas.addEventListener ('touchstart', this.OnTouchStart.bind (this));
-			this.canvas.addEventListener ('touchmove', this.OnTouchMove.bind (this));
+			this.canvas.addEventListener ('wheel', this.OnMouseWheel.bind (this), { passive: false });
+			this.canvas.addEventListener ('touchstart', this.OnTouchStart.bind (this), { passive: false });
+			this.canvas.addEventListener ('touchmove', this.OnTouchMove.bind (this), { passive: false });
 			this.canvas.addEventListener ('touchcancel', this.OnTouchEnd.bind (this));
 			this.canvas.addEventListener ('touchend', this.OnTouchEnd.bind (this));
 			this.canvas.addEventListener ('contextmenu', this.OnContextMenu.bind (this));
@@ -290,6 +292,12 @@ export class Navigation
 	SetNavigationMode (navigationMode)
 	{
 		this.navigationMode = navigationMode;
+	}
+
+	SetZoomSpeed (zoomSpeedMultiplier)
+	{
+		console.log('Navigation SetZoomSpeed called with:', zoomSpeedMultiplier); // Debug log
+		this.zoomSpeedMultiplier = zoomSpeedMultiplier;
 	}
 
 	GetCamera ()
@@ -408,7 +416,7 @@ export class Navigation
 			let panRatio = 0.001 * eyeCenterDistance;
 			this.Pan (moveDiff.x * panRatio, moveDiff.y * panRatio);
 		} else if (navigationType === NavigationType.Zoom) {
-			let zoomRatio = 0.005;
+			let zoomRatio = 0.01 * this.zoomSpeedMultiplier;
 			this.Zoom (-moveDiff.y * zoomRatio);
 		}
 
@@ -465,7 +473,7 @@ export class Navigation
 			let orbitRatio = 0.5;
 			this.Orbit (moveDiff.x * orbitRatio, moveDiff.y * orbitRatio);
 		} else if (navigationType === NavigationType.Pan) {
-			let zoomRatio = 0.005;
+			let zoomRatio = 0.02 * this.zoomSpeedMultiplier;
 			this.Zoom (distanceDiff * zoomRatio);
 			let panRatio = 0.001 * CoordDistance3D (this.camera.eye, this.camera.center);
 			this.Pan (moveDiff.x * panRatio, moveDiff.y * panRatio);
@@ -494,13 +502,27 @@ export class Navigation
 		let params = ev || window.event;
 		params.preventDefault ();
 
-		let delta = -params.deltaY / 40;
-		let ratio = 0.1;
-		if (delta < 0) {
-			ratio = ratio * -1.0;
+		// Get mouse coordinates relative to canvas
+		let rect = this.canvas.getBoundingClientRect();
+		let mouseX = params.clientX - rect.left;
+		let mouseY = params.clientY - rect.top;
+
+		// More responsive wheel handling - FIX: Remove negative sign to fix inverted scroll
+		let delta = params.deltaY;
+		let ratio = 0.2 * this.zoomSpeedMultiplier;
+
+		// Normalize different wheel modes (pixel, line, page)
+		if (params.deltaMode === 1) { // line mode
+			delta *= 16;
+		} else if (params.deltaMode === 2) { // page mode
+			delta *= 800;
 		}
 
-		this.Zoom (ratio);
+		// Scale ratio based on delta magnitude for smoother response
+		let normalizedDelta = Math.max(-1, Math.min(1, delta / 120));
+		ratio *= normalizedDelta;
+
+		this.ZoomToPoint (ratio, mouseX, mouseY);
 		this.Update ();
 	}
 
@@ -554,6 +576,12 @@ export class Navigation
 	{
 		let direction = SubCoord3D (this.camera.center, this.camera.eye);
 		let distance = direction.Length ();
+
+		// Early exit for very small movements
+		if (Math.abs(ratio) < 1e-8) {
+			return;
+		}
+
 		let move = distance * ratio;
 		// Prevent camera.eye from matching center exactly
 		if (Math.abs(distance + move) < 1e-6) {
@@ -562,9 +590,76 @@ export class Navigation
 		this.camera.eye.Offset(direction, move);
 	}
 
+	ZoomToPoint (ratio, mouseX, mouseY)
+	{
+		// Early exit for very small movements
+		if (Math.abs(ratio) < 1e-8) {
+			return;
+		}
+
+		// Get canvas dimensions
+		let canvasWidth = this.canvas.width;
+		let canvasHeight = this.canvas.height;
+
+		// Convert mouse coordinates to normalized device coordinates (-1 to 1)
+		// FIX: Correct NDC calculation
+		let ndcX = (mouseX / canvasWidth) * 2 - 1;
+		let ndcY = (mouseY / canvasHeight) * 2 - 1; // Remove negation to fix inversion
+
+		// Calculate the current camera vectors
+		let eyeToCenter = SubCoord3D (this.camera.center, this.camera.eye);
+		let distance = eyeToCenter.Length ();
+		let forward = eyeToCenter.Clone ().Normalize ();
+
+		// Calculate right and up vectors for the camera
+		let up = this.camera.up.Clone ().Normalize ();
+		let right = CrossVector3D (forward, up).Normalize ();
+		let actualUp = CrossVector3D (right, forward).Normalize ();
+
+		// Calculate the field of view and aspect ratio
+		let fov = 45.0 * Math.PI / 180.0;
+		let aspect = canvasWidth / canvasHeight;
+		let halfHeight = Math.tan(fov / 2) * distance;
+		let halfWidth = halfHeight * aspect;
+
+		// Calculate the offset from the center based on mouse position
+		let rightOffset = right.Clone ().MultiplyScalar (ndcX * halfWidth);
+		let upOffset = actualUp.Clone ().MultiplyScalar (-ndcY * halfHeight); // Flip Y to fix inversion
+		let totalOffset = AddCoord3D (rightOffset, upOffset);
+
+		// Calculate the target point in world space
+		let worldTarget = AddCoord3D (this.camera.center, totalOffset);
+
+		// Calculate zoom movement
+		let move = distance * ratio;
+
+		// Prevent camera.eye from matching center exactly
+		if (Math.abs(distance + move) < 1e-6) {
+			move = (move > 0 ? 1 : -1) * 1e-6;
+		}
+
+		// Simple approach: interpolate between current center and target point
+		let zoomFactor = move / distance;
+		let newCenter = AddCoord3D (
+			this.camera.center.Clone ().MultiplyScalar (1 - zoomFactor * 0.1),
+			worldTarget.Clone ().MultiplyScalar (zoomFactor * 0.1)
+		);
+
+		// Move camera eye to maintain distance
+		let newEyeToCenter = forward.Clone ().MultiplyScalar (distance + move);
+		this.camera.eye = SubCoord3D (newCenter, newEyeToCenter);
+		this.camera.center = newCenter;
+	}
+
 	Update ()
 	{
-		this.callbacks.onUpdate ();
+		if (!this.updateRequested) {
+			this.updateRequested = true;
+			requestAnimationFrame (() => {
+				this.updateRequested = false;
+				this.callbacks.onUpdate ();
+			});
+		}
 	}
 
 	Click (button, mouseCoords)

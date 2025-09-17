@@ -369,6 +369,12 @@ export class Viewer
         this.Render ();
     }
 
+    SetZoomSpeed (zoomSpeedMultiplier)
+    {
+        console.log('Viewer SetZoomSpeed called with:', zoomSpeedMultiplier); // Debug log
+        this.navigation.SetZoomSpeed (zoomSpeedMultiplier);
+    }
+
     SetUpVector (upDirection, animate)
     {
         let oldCamera = this.navigation.GetCamera ();

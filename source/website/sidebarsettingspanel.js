@@ -374,6 +374,60 @@ class SettingsModelDisplaySection extends SettingsSection
     }
 }
 
+class SettingsCameraSection extends SettingsSection
+{
+    constructor (parentDiv, cameraSettings)
+    {
+        super (parentDiv, Loc ('Camera'), cameraSettings);
+        this.cameraSettings = cameraSettings;
+
+        this.zoomSpeedSlider = null;
+        this.zoomSpeedSliderValue = null;
+    }
+
+    Init (callbacks)
+    {
+        super.Init (callbacks);
+
+        // Zoom speed slider
+        let zoomSpeedRow = AddDiv (this.contentDiv, 'ov_sidebar_settings_row large');
+        AddDiv (zoomSpeedRow, null, Loc ('Zoom Speed'));
+        this.zoomSpeedSlider = AddRangeSlider (zoomSpeedRow, 0.1, 3.0);
+        this.zoomSpeedSlider.setAttribute ('title', Loc ('Zoom Speed'));
+        this.zoomSpeedSlider.setAttribute ('step', '0.1');
+        this.zoomSpeedSliderValue = AddDomElement (zoomSpeedRow, 'span', 'ov_slider_label');
+
+        this.zoomSpeedSlider.addEventListener ('input', () => {
+            this.zoomSpeedSliderValue.innerHTML = parseFloat(this.zoomSpeedSlider.value).toFixed(1) + 'x';
+        });
+
+        this.zoomSpeedSlider.addEventListener ('change', () => {
+            this.cameraSettings.zoomSpeed = parseFloat(this.zoomSpeedSlider.value);
+            console.log('Zoom speed changed to:', this.cameraSettings.zoomSpeed); // Debug log
+            this.cameraSettings.SaveToCookies();
+            if (this.callbacks.onZoomSpeedChanged) {
+                this.callbacks.onZoomSpeedChanged();
+            }
+        });
+
+        this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
+        this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
+    }
+
+    Update ()
+    {
+        if (this.zoomSpeedSlider !== null) {
+            this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
+            this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
+        }
+    }
+
+    Clear ()
+    {
+        // No special cleanup needed for sliders
+    }
+}
+
 class SettingsImportParametersSection extends SettingsSection
 {
     constructor (parentDiv, settings)
@@ -451,12 +505,14 @@ class SettingsImportParametersSection extends SettingsSection
 
 export class SidebarSettingsPanel extends SidebarPanel
 {
-    constructor (parentDiv, settings)
+    constructor (parentDiv, settings, cameraSettings)
     {
         super (parentDiv);
         this.settings = settings;
+        this.cameraSettings = cameraSettings;
 
         this.sectionsDiv = AddDiv (this.contentDiv, 'ov_sidebar_settings_sections ov_thin_scrollbar');
+        this.cameraSection = new SettingsCameraSection (this.sectionsDiv, this.cameraSettings);
         this.modelDisplaySection = new SettingsModelDisplaySection (this.sectionsDiv, this.settings);
         this.importParametersSection = new SettingsImportParametersSection (this.sectionsDiv, this.settings);
 
@@ -483,6 +539,7 @@ export class SidebarSettingsPanel extends SidebarPanel
 
     Clear ()
     {
+        this.cameraSection.Clear ();
         this.modelDisplaySection.Clear ();
         this.importParametersSection.Clear ();
     }
@@ -512,6 +569,13 @@ export class SidebarSettingsPanel extends SidebarPanel
             },
             onEdgeThresholdChange : () => {
                 this.callbacks.onEdgeDisplayChanged ();
+            }
+        });
+        this.cameraSection.Init ({
+            onZoomSpeedChanged : () => {
+                if (this.callbacks.onZoomSpeedChanged) {
+                    this.callbacks.onZoomSpeedChanged ();
+                }
             }
         });
         this.importParametersSection.Init ({

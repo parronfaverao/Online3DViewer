@@ -5,13 +5,13 @@ import { SidebarSettingsPanel } from './sidebarsettingspanel.js';
 
 export class Sidebar
 {
-    constructor (mainDiv, settings)
+    constructor (mainDiv, settings, cameraSettings)
     {
         this.mainDiv = mainDiv;
         this.panelSet = new PanelSet (mainDiv);
 
         this.detailsPanel = new SidebarDetailsPanel (this.panelSet.GetContentDiv ());
-        this.settingsPanel = new SidebarSettingsPanel (this.panelSet.GetContentDiv (), settings);
+        this.settingsPanel = new SidebarSettingsPanel (this.panelSet.GetContentDiv (), settings, cameraSettings);
 
         this.panelSet.AddPanel (this.detailsPanel);
         this.panelSet.AddPanel (this.settingsPanel);

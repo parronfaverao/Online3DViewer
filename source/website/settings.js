@@ -1,7 +1,7 @@
 import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBAColor, RGBColor } from '../engine/model/color.js';
 import { EdgeSettings } from '../engine/viewer/viewermodel.js';
-import { CookieGetBoolVal, CookieGetRGBColorVal, CookieGetIntVal, CookieGetStringVal, CookieSetBoolVal, CookieSetRGBColorVal, CookieSetIntVal, CookieSetStringVal, CookieSetRGBAColorVal, CookieGetRGBAColorVal } from './cookiehandler.js';
+import { CookieGetBoolVal, CookieGetRGBColorVal, CookieGetIntVal, CookieGetStringVal, CookieSetBoolVal, CookieSetRGBColorVal, CookieSetIntVal, CookieSetStringVal, CookieSetRGBAColorVal, CookieGetRGBAColorVal, CookieGetFloatVal, CookieSetFloatVal } from './cookiehandler.js';
 import { GetPreferredColorScheme } from './utils.js';
 
 export const Theme =
@@ -62,17 +62,20 @@ export class CameraSettings
     {
         this.navigationMode = NavigationMode.FixedUpVector;
         this.projectionMode = ProjectionMode.Perspective;
+        this.zoomSpeed = 1.0; // Default zoom speed multiplier
     }
 
     LoadFromCookies ()
     {
         this.navigationMode = CookieGetIntVal ('ov_navigation_mode', NavigationMode.FixedUpVector);
         this.projectionMode = CookieGetIntVal ('ov_projection_mode', ProjectionMode.Perspective);
+        this.zoomSpeed = CookieGetFloatVal ('ov_zoom_speed', 1.0);
     }
 
     SaveToCookies ()
     {
         CookieSetIntVal ('ov_navigation_mode', this.navigationMode);
         CookieSetIntVal ('ov_projection_mode', this.projectionMode);
+        CookieSetFloatVal ('ov_zoom_speed', this.zoomSpeed);
     }
 }

@@ -49,6 +49,20 @@ export function CookieSetIntVal (key, value)
     CookieSetStringVal (key, value.toString ());
 }
 
+export function CookieGetFloatVal (key, defVal)
+{
+    let stringVal = CookieGetStringVal (key, null);
+    if (stringVal === null) {
+        return defVal;
+    }
+    return parseFloat (stringVal);
+}
+
+export function CookieSetFloatVal (key, value)
+{
+    CookieSetStringVal (key, value.toString ());
+}
+
 export function CookieGetRGBColorVal (key, defVal)
 {
     let stringVal = CookieGetStringVal (key, null);
