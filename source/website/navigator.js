@@ -181,10 +181,12 @@ export class Navigator
         this.callbacks.onMeshVisibilityChanged ();
     }
 
-    ToggleMeshVisibility (meshInstanceId)
+    ToggleMeshVisibility (meshInstanceId, suppressRender = false)
     {
-        this.meshesPanel.ToggleMeshVisibility (meshInstanceId);
-        this.callbacks.onMeshVisibilityChanged ();
+        this.meshesPanel.ToggleMeshVisibility(meshInstanceId);
+        if (!suppressRender) {
+            this.callbacks.onMeshVisibilityChanged();
+        }
     }
 
     IsMeshIsolated (meshInstanceId)

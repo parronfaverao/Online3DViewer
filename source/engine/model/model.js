@@ -8,7 +8,7 @@ export class Model extends ModelObject3D
     constructor ()
     {
         super ();
-        this.unit = Unit.Unknown;
+        this.unit = Unit.Millimeter;
         this.root = new Node ();
         this.materials = [];
         this.meshes = [];

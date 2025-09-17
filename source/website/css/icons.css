@@ -68,10 +68,6 @@ i[class^="icon-"]:before, i[class*=" icon-"]:before {
 .icon-files:before {
     content: "\f112";
 }
-.icon-fit:before {
-    content: "\f113";
-}
-.icon-fix_up_off:before {
     content: "\f114";
 }
 .icon-fix_up_on:before {

@@ -446,21 +446,32 @@ export class Viewer
         this.Render ();
     }
 
-    SetMeshesVisibility (isVisible)
+    SetMeshesVisibility (isVisible, suppressRender = false)
     {
-        this.mainModel.EnumerateMeshesAndLines ((mesh) => {
-            let visible = isVisible (mesh.userData);
+        this.mainModel.EnumerateMeshesAndLines((mesh) => {
+            let visible = isVisible(mesh.userData);
             if (mesh.visible !== visible) {
                 mesh.visible = visible;
             }
         });
-        this.mainModel.EnumerateEdges ((edge) => {
-            let visible = isVisible (edge.userData);
+        this.mainModel.EnumerateEdges((edge) => {
+            let visible = isVisible(edge.userData);
             if (edge.visible !== visible) {
                 edge.visible = visible;
             }
         });
-        this.Render ();
+        if (!suppressRender && !this._batchUpdateActive) {
+            this.Render();
+        }
+    }
+
+    BeginBatchUpdate() {
+        this._batchUpdateActive = true;
+    }
+
+    EndBatchUpdate() {
+        this._batchUpdateActive = false;
+        this.Render();
     }
 
     SetMeshesHighlight (highlightColor, isHighlighted)

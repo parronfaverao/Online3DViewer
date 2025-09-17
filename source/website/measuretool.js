@@ -144,11 +144,14 @@ export class MeasureTool
             return;
         }
 
+        // Snap to closest vertex
+        let snappedIntersection = this.GetSnappedIntersection(intersection);
+
         if (this.markers.length === 2) {
             this.ClearMarkers ();
         }
 
-        this.AddMarker (intersection);
+        this.AddMarker (snappedIntersection);
         this.UpdatePanel ();
     }
 
@@ -162,12 +165,62 @@ export class MeasureTool
             }
             return;
         }
+        // Snap to closest vertex
+        let snappedIntersection = this.GetSnappedIntersection(intersection);
         if (this.tempMarker === null) {
-            this.tempMarker = this.GenerateMarker (intersection);
+            this.tempMarker = this.GenerateMarker (snappedIntersection);
         }
-        this.tempMarker.UpdatePosition (intersection);
+        this.tempMarker.UpdatePosition (snappedIntersection);
         this.tempMarker.Show (true);
         this.viewer.Render ();
+    }
+    // Given a THREE.js intersection, return a new intersection with the closest vertex as the point
+    GetSnappedIntersection (intersection)
+    {
+        if (!intersection.object) {
+            return intersection;
+        }
+        // Try meshInstanceId method first
+        let closestVertex = null;
+        let minDist = Number.POSITIVE_INFINITY;
+        let found = false;
+        if (intersection.object.userData && intersection.object.userData.meshInstanceId && this.viewer.model && this.viewer.model.GetMeshInstance) {
+            let meshInstanceId = intersection.object.userData.meshInstanceId;
+            let meshInstance = this.viewer.model.GetMeshInstance(meshInstanceId);
+            if (meshInstance) {
+                meshInstance.EnumerateVertices((vertex) => {
+                    let dist = intersection.point.distanceTo(vertex);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestVertex = vertex;
+                    }
+                });
+                found = true;
+            }
+        }
+        // Fallback: use geometry vertices directly
+        if (!found && intersection.object.geometry && intersection.object.geometry.attributes && intersection.object.geometry.attributes.position) {
+            let posAttr = intersection.object.geometry.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                let vx = posAttr.getX(i);
+                let vy = posAttr.getY(i);
+                let vz = posAttr.getZ(i);
+                let v = new THREE.Vector3(vx, vy, vz);
+                // Transform to world coordinates
+                v.applyMatrix4(intersection.object.matrixWorld);
+                let dist = intersection.point.distanceTo(v);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestVertex = v;
+                }
+            }
+        }
+        if (closestVertex) {
+            let snapped = Object.assign({}, intersection);
+            snapped.point = closestVertex.clone ? closestVertex.clone() : new THREE.Vector3(closestVertex.x, closestVertex.y, closestVertex.z);
+            return snapped;
+        }
+        return intersection;
     }
 
     AddMarker (intersection)

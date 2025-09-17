@@ -1,9 +1,11 @@
+import { Coord3D } from '../engine/geometry/coord3d.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
 import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
+import { GetDefaultCamera } from '../engine/viewer/viewer.js';
 import { AddDiv, AddDomElement, ShowDomElement, SetDomElementOuterHeight, CreateDomElement, GetDomElementOuterWidth, GetDomElementOuterHeight } from '../engine/viewer/domutils.js';
 import { CalculatePopupPositionToScreen, ShowListPopup } from './dialogs.js';
 import { HandleEvent } from './eventhandler.js';
@@ -347,7 +349,7 @@ export class Website
             });
             if (this.navigator.HasHiddenMesh ()) {
                 items.push ({
-                    name : Loc ('Show all meshes'),
+                    name : Loc ('Show all parts'),
                     icon : 'visible',
                     onClick : () => {
                         this.navigator.ShowAllMeshes (true);
@@ -356,23 +358,16 @@ export class Website
             }
         } else {
             items.push ({
-                name : Loc ('Hide mesh'),
+                name : Loc ('Hide part'),
                 icon : 'hidden',
                 onClick : () => {
                     this.navigator.ToggleMeshVisibility (meshUserData.originalMeshInstance.id);
                 }
             });
-            items.push ({
-                name : Loc ('Fit mesh to window'),
-                icon : 'fit',
-                onClick : () => {
-                    this.navigator.FitMeshToWindow (meshUserData.originalMeshInstance.id);
-                }
-            });
             if (this.navigator.MeshItemCount () > 1) {
                 let isMeshIsolated = this.navigator.IsMeshIsolated (meshUserData.originalMeshInstance.id);
                 items.push ({
-                    name : isMeshIsolated ? Loc ('Remove isolation') : Loc ('Isolate mesh'),
+                    name : isMeshIsolated ? Loc ('Remove isolation') : Loc ('Isolate part'),
                     icon : isMeshIsolated ? 'deisolate' : 'isolate',
                     onClick : () => {
                         if (isMeshIsolated) {
@@ -383,7 +378,74 @@ export class Website
                     }
                 });
             }
+
+            // Add 'Hide group' button if meshUserData is present
+            items.push({
+                name: Loc('Hide group'),
+                icon: 'hidden',
+                onClick: () => {
+                    // Find all mesh instances with the same group/parent node as the selected mesh
+                    const selectedNode = meshUserData.originalMeshInstance.node;
+                    if (selectedNode && selectedNode.parent) {
+                        const groupName = selectedNode.parent.name;
+                        // Hide all meshes whose parent node has the same name
+                        this.model.EnumerateMeshInstances((meshInstance) => {
+                            if (meshInstance.node && meshInstance.node.parent && meshInstance.node.parent.name === groupName) {
+                                this.navigator.ToggleMeshVisibility(meshInstance.id, false); // false = hide
+                            }
+                        });
+                    }
+                }
+            });
+
+            // Add 'Isolate group' button if meshUserData is present
+            items.push({
+                name: Loc('Isolate group'),
+                icon: 'isolate',
+                onClick: () => {
+                    // Scene batching: suppress renders during mesh visibility changes, then render once after batch
+                    const selectedNode = meshUserData.originalMeshInstance.node;
+                    if (selectedNode && selectedNode.parent) {
+                        const groupName = selectedNode.parent.name;
+                        const toShow = [];
+                        const toHide = [];
+                        this.viewer.BeginBatchUpdate();
+                        this.model.EnumerateMeshInstances((meshInstance) => {
+                            if (meshInstance.node && meshInstance.node.parent && meshInstance.node.parent.name === groupName) {
+                                toShow.push(meshInstance.id);
+                            } else {
+                                toHide.push(meshInstance.id);
+                            }
+                        });
+                        // Hide all not in group
+                        for (const id of toHide) {
+                            if (this.navigator.IsMeshVisible(id)) {
+                                this.navigator.ToggleMeshVisibility(id, false, true); // suppress render
+                            }
+                        }
+                        // Show all in group
+                        for (const id of toShow) {
+                            if (!this.navigator.IsMeshVisible(id)) {
+                                this.navigator.ToggleMeshVisibility(id, true, true); // suppress render
+                            }
+                        }
+                        this.viewer.EndBatchUpdate();
+                    }
+                }
+            });
+
+            // Move 'Fit part to window' to the end of the list
+            items.push ({
+                name : Loc ('Fit part to window'),
+                icon : 'fit',
+                onClick : () => {
+                    this.navigator.FitMeshToWindow (meshUserData.originalMeshInstance.id);
+                }
+            });
         }
+        // Sort context menu items alphabetically by name
+        items.sort((a, b) => a.name.localeCompare(b.name));
+
         ShowListPopup (items, {
             calculatePosition : (contentDiv) => {
                 return CalculatePopupPositionToScreen (globalMouseCoordinates, contentDiv);
@@ -556,7 +618,7 @@ export class Website
 
     UpdateEnvironmentMap ()
     {
-        let envMapPath = 'assets/envmaps/' + this.settings.environmentMapName + '/';
+    let envMapPath = '/website/assets/envmaps/' + this.settings.environmentMapName + '/';
         let envMapTextures = [
             envMapPath + 'posx.jpg',
             envMapPath + 'negx.jpg',
@@ -600,6 +662,32 @@ export class Website
         this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
         this.viewer.SetProjectionMode (this.cameraSettings.projectionMode);
         this.UpdateEnvironmentMap ();
+
+        // Add long touch support for context menu (right-click) on touch devices
+        let longTouchTimer = null;
+        let longTouchDuration = 500; // ms
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                longTouchTimer = setTimeout(() => {
+                    // Simulate right-click/context menu at touch position
+                    const touch = e.touches[0];
+                    const event = new MouseEvent('contextmenu', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                    });
+                    canvas.dispatchEvent(event);
+                }, longTouchDuration);
+            }
+        });
+        canvas.addEventListener('touchend', () => {
+            clearTimeout(longTouchTimer);
+        });
+        canvas.addEventListener('touchmove', () => {
+            clearTimeout(longTouchTimer);
+        });
     }
 
     InitToolbar ()
@@ -617,9 +705,19 @@ export class Website
 
         function AddPushButton (toolbar, imageName, imageTitle, classNames, onClick)
         {
-            let button = toolbar.AddImagePushButton (imageName, imageTitle, false, (isSelected) => {
-                onClick (isSelected);
-            });
+            let button;
+            // Use text label for view buttons
+            if (imageName === 'front_view_text') {
+                button = toolbar.AddTextPushButton('FV', imageTitle, false, (isSelected) => { onClick(isSelected); });
+            } else if (imageName === 'top_view_text') {
+                button = toolbar.AddTextPushButton('TV', imageTitle, false, (isSelected) => { onClick(isSelected); });
+            } else if (imageName === 'side_view_text') {
+                button = toolbar.AddTextPushButton('SV', imageTitle, false, (isSelected) => { onClick(isSelected); });
+            } else {
+                button = toolbar.AddImagePushButton (imageName, imageTitle, false, (isSelected) => {
+                    onClick (isSelected);
+                });
+            }
             for (let className of classNames) {
                 button.AddClass (className);
             }
@@ -658,7 +756,9 @@ export class Website
         }
 
         let importer = this.modelLoaderUI.GetImporter ();
-        let navigationModeIndex = (this.cameraSettings.navigationMode === NavigationMode.FixedUpVector ? 0 : 1);
+    // Set Fixed Up Vector as the standard
+    this.cameraSettings.navigationMode = NavigationMode.FixedUpVector;
+    let navigationModeIndex = 0;
         let projectionModeIndex = (this.cameraSettings.projectionMode === ProjectionMode.Perspective ? 0 : 1);
 
         AddButton (this.toolbar, 'open', Loc ('Open from your device'), [], () => {
@@ -672,29 +772,215 @@ export class Website
             });
         });
         AddSeparator (this.toolbar, ['only_on_model']);
-        AddButton (this.toolbar, 'fit', Loc ('Fit model to window'), ['only_on_model'], () => {
-            this.FitModelToWindow (false);
-        });
-        AddButton (this.toolbar, 'up_y', Loc ('Set Y axis as up vector'), ['only_on_model'], () => {
-            this.viewer.SetUpVector (Direction.Y, true);
-        });
-        AddButton (this.toolbar, 'up_z', Loc ('Set Z axis as up vector'), ['only_on_model'], () => {
-            this.viewer.SetUpVector (Direction.Z, true);
-        });
-        AddButton (this.toolbar, 'flip', Loc ('Flip up vector'), ['only_on_model'], () => {
-            this.viewer.FlipUpVector ();
-        });
-        AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
-        AddRadioButton (this.toolbar, ['fix_up_on', 'fix_up_off'], [Loc ('Fixed up vector'), Loc ('Free orbit')], navigationModeIndex, ['only_full_width', 'only_on_model'], (buttonIndex) => {
-            if (buttonIndex === 0) {
-                this.cameraSettings.navigationMode = NavigationMode.FixedUpVector;
-            } else if (buttonIndex === 1) {
-                this.cameraSettings.navigationMode = NavigationMode.FreeOrbit;
+        // AddButton (this.toolbar, 'expand', Loc ('Fit model to window'), ['only_on_model'], () => {
+        //     this.FitModelToWindow (false);
+        // });
+        // Store previous camera and navigation mode
+        let previousCamera = null;
+        let previousNavMode = null;
+        function setStandardView() {
+            if (previousCamera) {
+                // Restore previous camera and navigation mode
+                if (this.viewer.SetCamera) {
+                    this.viewer.SetCamera(previousCamera);
+                }
+                // Always restore Y as up vector for standard view
+                if (this.viewer.SetUpVector) {
+                    this.viewer.SetUpVector(Direction.Y, false);
+                }
+                if (this.viewer.SetNavigationMode && previousNavMode !== null) {
+                    this.viewer.SetNavigationMode(previousNavMode);
+                }
             }
-            this.cameraSettings.SaveToCookies ();
-            this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
+        }
+
+        // Mutually exclusive view buttons
+        const viewButtons = {};
+        function deactivateAllViewButtons(except) {
+            for (const key in viewButtons) {
+                if (key !== except && viewButtons[key].IsSelected()) {
+                    viewButtons[key].SetSelected(false);
+                    setStandardView.call(this);
+                }
+            }
+        }
+
+        // Front view (toggle, mutually exclusive)
+    viewButtons.front = AddPushButton(this.toolbar, 'front_view_text', Loc('Front view'), ['only_on_model'], (isSelected) => {
+            if (isSelected) {
+                deactivateAllViewButtons.call(this, 'front');
+                previousCamera = this.viewer.navigation.GetCamera().Clone();
+                previousNavMode = this.viewer.GetNavigationMode();
+                let boundingSphere = this.viewer.GetBoundingSphere(() => true);
+                if (boundingSphere) {
+                    let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
+                    let radius = boundingSphere.radius;
+                    let eye = new Coord3D(center.x - radius * 2.5, center.y, center.z);
+                    let up = new Coord3D(0, 1, 0);
+                    let fov = 45.0;
+                    let camera = { eye, center, up, fov };
+                    this.viewer.SetCamera(camera);
+                    if (this.viewer.SetUpVector) {
+                        this.viewer.SetUpVector(Direction.Y, false);
+                    }
+                    if (this.viewer.SetNavigationMode && this.cameraSettings) {
+                        this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
+                    }
+                }
+            } else {
+                setStandardView.call(this);
+            }
         });
-        AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
+        // Top view (toggle, mutually exclusive)
+    viewButtons.top = AddPushButton(this.toolbar, 'top_view_text', Loc('Top view'), ['only_on_model'], (isSelected) => {
+            if (isSelected) {
+                deactivateAllViewButtons.call(this, 'top');
+                previousCamera = this.viewer.navigation.GetCamera().Clone();
+                previousNavMode = this.viewer.GetNavigationMode();
+                let boundingSphere = this.viewer.GetBoundingSphere(() => true);
+                if (boundingSphere) {
+                    let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
+                    let radius = boundingSphere.radius;
+                    let eye = new Coord3D(center.x, center.y + radius * 2.5, center.z);
+                    let up = new Coord3D(1, 0, 0);
+                    let fov = 45.0;
+                    let camera = { eye, center, up, fov };
+                    this.viewer.SetCamera(camera);
+                    if (this.viewer.SetUpVector) {
+                        this.viewer.SetUpVector(Direction.Z, false);
+                    }
+                    if (this.viewer.SetNavigationMode && this.cameraSettings) {
+                        this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
+                    }
+                }
+            } else {
+                setStandardView.call(this);
+            }
+        });
+        // Side view (toggle, mutually exclusive)
+    viewButtons.side = AddPushButton(this.toolbar, 'side_view_text', Loc('Side view'), ['only_on_model'], (isSelected) => {
+            if (isSelected) {
+                deactivateAllViewButtons.call(this, 'side');
+                previousCamera = this.viewer.navigation.GetCamera().Clone();
+                previousNavMode = this.viewer.GetNavigationMode();
+                let boundingSphere = this.viewer.GetBoundingSphere(() => true);
+                if (boundingSphere) {
+                    let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
+                    let radius = boundingSphere.radius;
+                    let eye = new Coord3D(center.x, center.y, center.z + radius * 2.5);
+                    let up = new Coord3D(0, 1, 0);
+                    let fov = 45.0;
+                    let camera = { eye, center, up, fov };
+                    this.viewer.SetCamera(camera);
+                    if (this.viewer.SetUpVector) {
+                        this.viewer.SetUpVector(Direction.Y, false);
+                    }
+                    if (this.viewer.SetNavigationMode && this.cameraSettings) {
+                        this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
+                    }
+                }
+            } else {
+                setStandardView.call(this);
+            }
+        });
+        // Mutually exclusive up vector/flip buttons
+        const upButtons = {};
+        function deactivateAllUpButtons(except) {
+            for (const key in upButtons) {
+                if (key !== except && upButtons[key].IsSelected()) {
+                    upButtons[key].SetSelected(false);
+                }
+            }
+        }
+
+    // --- Flip up button removed by request on 2025-09-17 ---
+    /*
+    upButtons.flip = AddButton(this.toolbar, 'flip', Loc('Flip up view'), ['only_on_model'], () => {
+        // Toggle between front/back, side RH/LH, top/bottom infinitely
+        if (!this._flipState) this._flipState = {};
+        let activeView = null;
+        for (const key in viewButtons) {
+            if (viewButtons[key].IsSelected()) {
+                activeView = key;
+                break;
+            }
+        }
+        let boundingSphere = this.viewer.GetBoundingSphere(() => true);
+        if (activeView && boundingSphere) {
+            let center = boundingSphere.center;
+            let radius = boundingSphere.radius;
+            let eye, up, fov = 45.0;
+            // Track flip state per view
+            if (!this._flipState[activeView]) this._flipState[activeView] = false;
+            this._flipState[activeView] = !this._flipState[activeView];
+            if (activeView === 'front') {
+                if (this._flipState[activeView]) {
+                    // Back view
+                    eye = center.clone();
+                    eye.x += radius * 2.5;
+                } else {
+                    // Front view
+                    eye = center.clone();
+                    eye.x -= radius * 2.5;
+                }
+                up = { x: 0, y: 1, z: 0 };
+            } else if (activeView === 'side') {
+                if (this._flipState[activeView]) {
+                    // LH side
+                    eye = center.clone();
+                    eye.z -= radius * 2.5;
+                } else {
+                    // RH side
+                    eye = center.clone();
+                    eye.z += radius * 2.5;
+                }
+                up = { x: 0, y: 1, z: 0 };
+            } else if (activeView === 'top') {
+                if (this._flipState[activeView]) {
+                    // Bottom view
+                    eye = center.clone();
+                    eye.y -= radius * 2.5;
+                } else {
+                    // Top view
+                    eye = center.clone();
+                    eye.y += radius * 2.5;
+                }
+                up = { x: 1, y: 0, z: 0 };
+            }
+            if (eye && up) {
+                let camera = { eye, center, up, fov };
+                this.viewer.SetCamera(camera);
+                // Keep up vector and navigation mode as in the original view
+                if (activeView === 'top') {
+                    this.viewer.SetUpVector(Direction.Z, false);
+                } else {
+                    this.viewer.SetUpVector(Direction.Y, false);
+                }
+                if (this.viewer.SetNavigationMode && this.cameraSettings) {
+                    this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
+                }
+                return;
+            }
+        }
+        // Default flip if not in a standard view
+        this.viewer.FlipUpVector();
+    });
+    */
+    // ---------------------------------------------------------------
+        // Only one separator needed between side view and camera mode
+        // AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
+    // Removed Free Orbit button from the toolbar. The logic is preserved below for reference:
+    /*
+    AddRadioButton (this.toolbar, ['up_y', ''], [Loc ('Fixed up vector'), Loc ('Free orbit')], navigationModeIndex, ['only_full_width', 'only_on_model'], (buttonIndex) => {
+        if (buttonIndex === 0) {
+            this.cameraSettings.navigationMode = NavigationMode.FixedUpVector;
+        } else if (buttonIndex === 1) {
+            this.cameraSettings.navigationMode = NavigationMode.FreeOrbit;
+        }
+        this.cameraSettings.SaveToCookies ();
+        this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
+    });
+    */
         AddRadioButton (this.toolbar, ['camera_perspective', 'camera_orthographic'], [Loc ('Perspective camera'), Loc ('Orthographic camera')], projectionModeIndex, ['only_full_width', 'only_on_model'], (buttonIndex) => {
             if (buttonIndex === 0) {
                 this.cameraSettings.projectionMode = ProjectionMode.Perspective;
@@ -712,6 +998,8 @@ export class Website
             this.measureTool.SetActive (isSelected);
         });
         this.measureTool.SetButton (measureToolButton);
+        // --- Download and Export buttons removed by request on 2025-09-17 ---
+        /*
         AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
         AddButton (this.toolbar, 'download', Loc ('Download'), ['only_full_width', 'only_on_model'], () => {
             HandleEvent ('model_downloaded', '');
@@ -725,13 +1013,15 @@ export class Website
                 }
             });
         });
+        */
+        // ---------------------------------------------------------------
+        AddButton (this.toolbar, 'snapshot', Loc ('Create snapshot'), ['only_full_width', 'only_on_model'], () => {
+            ShowSnapshotDialog (this.viewer);
+        });
         AddButton (this.toolbar, 'share', Loc ('Share'), ['only_full_width', 'only_on_model'], () => {
             ShowSharingDialog (importer.GetFileList (), this.settings, this.viewer);
         });
         AddSeparator (this.toolbar, ['only_full_width', 'only_on_model']);
-        AddButton (this.toolbar, 'snapshot', Loc ('Create snapshot'), ['only_full_width', 'only_on_model'], () => {
-            ShowSnapshotDialog (this.viewer);
-        });
 
         EnumeratePlugins (PluginType.Toolbar, (plugin) => {
             plugin.registerButtons ({
@@ -925,7 +1215,9 @@ export class Website
                 this.sidebar.AddObject3DProperties (this.model, this.model);
             },
             onMeshSelected : (meshInstanceId) => {
-                let meshInstance = this.model.GetMeshInstance (meshInstanceId);
+                console.log('onMeshSelected called', meshInstanceId);
+                let meshInstance = this.model.GetMeshInstance(meshInstanceId);
+                console.log('meshInstance:', meshInstance);
                 this.sidebar.AddObject3DProperties (this.model, meshInstance);
             },
             onMaterialSelected : (materialIndex) => {

@@ -20,8 +20,8 @@ class NavigatorMeshesPopupButton extends NavigatorPopupButton
             return;
         }
 
-        let meshesText = FLoc ('Meshes ({0})', this.meshInstanceArray.length);
-        this.buttonText.innerHTML = meshesText;
+    let partsText = FLoc ('Parts ({0})', this.meshInstanceArray.length);
+    this.buttonText.innerHTML = partsText;
     }
 
     OnButtonClick ()

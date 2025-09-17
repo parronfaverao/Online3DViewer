@@ -48,37 +48,69 @@ export class SidebarDetailsPanel extends SidebarPanel
 
     AddObject3DProperties (model, object3D)
     {
+        // DEBUG: Log entry to AddObject3DProperties
+        console.log('AddObject3DProperties called', model, object3D);
+
         this.Clear ();
         let table = AddDiv (this.contentDiv, 'ov_property_table');
+        // Add part name
+        if (typeof object3D.GetName === 'function') {
+            const partName = object3D.GetName();
+            if (partName && partName.length > 0) {
+                // DEBUG: Log the part name and object3D before adding property
+                console.log('Part name for details panel:', partName, object3D);
+                this.AddProperty(table, new Property(PropertyType.Text, Loc('Name'), partName));
+            }
+        }
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
         let unit = model.GetUnit ();
-        this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Vertices'), object3D.VertexCount ()));
-        let lineSegmentCount = object3D.LineSegmentCount ();
-        if (lineSegmentCount > 0) {
-            this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Lines'), lineSegmentCount));
-        }
-        let triangleCount = object3D.TriangleCount ();
-        if (triangleCount > 0) {
-            this.AddProperty (table, new Property (PropertyType.Integer, Loc ('Triangles'), triangleCount));
-        }
-        if (unit !== Unit.Unknown) {
-            this.AddProperty (table, new Property (PropertyType.Text, Loc ('Unit'), UnitToString (unit)));
-        }
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size X'), size.x));
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size Y'), size.y));
-        this.AddProperty (table, new Property (PropertyType.Number, Loc ('Size Z'), size.z));
-        this.AddCalculatedProperty (table, Loc ('Volume'), () => {
-            if (!IsTwoManifold (object3D)) {
-                return null;
+        const toMM = (val) => {
+            if (unit === Unit.Meter) return val * 1000.0;
+            if (unit === Unit.Centimeter) return val * 10.0;
+            return val;
+        };
+        const toMM3 = (val) => {
+            if (unit === Unit.Meter) return val * 1e9;
+            if (unit === Unit.Centimeter) return val * 1e3;
+            return val;
+        };
+
+   // Display Group and Part name from node
+        if (object3D && object3D.node) {
+            // Part name: node.name
+            // Group: node.parent.name (if exists)
+            const partName = object3D.node.name || '';
+            let groupName = '';
+            if (object3D.node.parent && object3D.node.parent.name) {
+                groupName = object3D.node.parent.name;
             }
-            const volume = CalculateVolume (object3D);
-            return new Property (PropertyType.Number, null, volume);
-        });
-        this.AddCalculatedProperty (table, Loc ('Surface'), () => {
-            const surfaceArea = CalculateSurfaceArea (object3D);
-            return new Property (PropertyType.Number, null, surfaceArea);
-        });
+            if (groupName) {
+                this.AddProperty(table, new Property(PropertyType.Text, '<b>' + Loc('Group') + ':</b>', groupName));
+            }
+            if (partName) {
+                this.AddProperty(table, new Property(PropertyType.Text, '<b>' + Loc('Part name') + ':</b>', partName));
+                // Add a blank row for spacing
+                AddDiv(table, 'ov_property_table_row', '\u00A0');
+            }
+        }
+
+   // Display Dimensions
+
+    // Sort and label dimensions as Length (largest), Thickness (smallest), Width (remaining)
+    let dims = [toMM(size.x*1000), toMM(size.y*1000), toMM(size.z*1000)];
+    let sorted = [...dims].sort((a, b) => a - b);
+    let thickness = sorted[0];
+    let width = sorted[1];
+    let length = sorted[2];
+    // Map original dims to labels
+    this.AddProperty(table, new Property(PropertyType.Number, Loc('L. (mm)'), length));
+    this.AddProperty(table, new Property(PropertyType.Number, Loc('W. (mm)'), width));
+    this.AddProperty(table, new Property(PropertyType.Number, Loc('T. (mm)'), thickness));
+
+
+
+
         if (object3D.PropertyGroupCount () > 0) {
             let customTable = AddDiv (this.contentDiv, 'ov_property_table ov_property_table_custom');
             for (let i = 0; i < object3D.PropertyGroupCount (); i++) {

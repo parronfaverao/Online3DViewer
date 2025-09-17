@@ -1,56 +1,38 @@
 import { AddDiv, CreateDiv } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, InstallTooltip } from './utils.js';
 
-export class ToolbarButton
-{
-    constructor (image, imageTitle, onClick)
-    {
+export class ToolbarButton {
+    constructor (image, imageTitle, onClick) {
         this.image = image;
         this.imageTitle = imageTitle;
-
         this.selected = false;
         this.buttonDiv = CreateDiv ('ov_toolbar_button');
         this.buttonImg = AddSvgIconElement (this.buttonDiv, this.image);
         if (onClick !== null) {
             this.buttonDiv.addEventListener ('click', onClick);
         }
-
         this.buttonDiv.setAttribute ('alt', this.imageTitle);
         InstallTooltip (this.buttonDiv, this.imageTitle);
     }
-
-    AddDomElements (parentDiv)
-    {
+    AddDomElements (parentDiv) {
         parentDiv.appendChild (this.buttonDiv);
     }
-
-    AddClass (className)
-    {
+    AddClass (className) {
         this.buttonDiv.classList.add (className);
     }
-
-    RemoveClass (className)
-    {
+    RemoveClass (className) {
         this.buttonDiv.classList.remove (className);
     }
-
-    AddImageClass (className)
-    {
+    AddImageClass (className) {
         this.buttonImg.classList.add (className);
     }
-
-    RemoveImageClass (className)
-    {
+    RemoveImageClass (className) {
         this.buttonImg.classList.remove (className);
     }
-
-    IsSelected ()
-    {
+    IsSelected () {
         return this.selected;
     }
-
-    SetSelected (selected)
-    {
+    SetSelected (selected) {
         this.selected = selected;
         if (this.selected) {
             this.buttonDiv.classList.add ('selected');
@@ -60,22 +42,16 @@ export class ToolbarButton
     }
 }
 
-export class Toolbar
-{
-    constructor (parentDiv)
-    {
+export class Toolbar {
+    constructor (parentDiv) {
         this.mainDiv = AddDiv (parentDiv, 'ov_toolbar');
     }
-
-    AddImageButton (image, imageTitle, onClick)
-    {
+    AddImageButton (image, imageTitle, onClick) {
         let button = new ToolbarButton (image, imageTitle, onClick);
         button.AddDomElements (this.mainDiv);
         return button;
     }
-
-    AddImagePushButton (image, imageTitle, isSelected, onClick)
-    {
+    AddImagePushButton (image, imageTitle, isSelected, onClick) {
         let button = new ToolbarButton (image, imageTitle, () => {
             button.SetSelected (!button.IsSelected ());
             onClick (button.IsSelected ());
@@ -84,9 +60,7 @@ export class Toolbar
         button.SetSelected (isSelected);
         return button;
     }
-
-    AddImageRadioButton (buttonData, selectedIndex, onClick)
-    {
+    AddImageRadioButton (buttonData, selectedIndex, onClick) {
         let buttons = [];
         for (let buttonIndex = 0; buttonIndex < buttonData.length; buttonIndex++) {
             let data = buttonData[buttonIndex];
@@ -108,9 +82,41 @@ export class Toolbar
         }
         return buttons;
     }
-
-    AddSeparator ()
-    {
+    AddSeparator () {
         return AddDiv (this.mainDiv, 'ov_toolbar_separator');
+    }
+    AddTextPushButton (text, textTitle, isSelected, onClick) {
+        let buttonDiv = CreateDiv('ov_toolbar_button');
+        buttonDiv.textContent = text;
+        buttonDiv.setAttribute('alt', textTitle);
+        InstallTooltip(buttonDiv, textTitle);
+        buttonDiv.classList.add('ov_toolbar_text_button');
+        if (isSelected) {
+            buttonDiv.classList.add('selected');
+        }
+        buttonDiv.addEventListener('click', () => {
+            let selected = !buttonDiv.classList.contains('selected');
+            if (selected) {
+                buttonDiv.classList.add('selected');
+            } else {
+                buttonDiv.classList.remove('selected');
+            }
+            onClick(selected);
+        });
+        this.mainDiv.appendChild(buttonDiv);
+        // Return a minimal compatible interface for AddPushButton
+        return {
+            AddClass: (className) => buttonDiv.classList.add(className),
+            RemoveClass: (className) => buttonDiv.classList.remove(className),
+            IsSelected: () => buttonDiv.classList.contains('selected'),
+            SetSelected: (selected) => {
+                if (selected) {
+                    buttonDiv.classList.add('selected');
+                } else {
+                    buttonDiv.classList.remove('selected');
+                }
+            },
+            buttonDiv
+        };
     }
 }

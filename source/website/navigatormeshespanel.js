@@ -87,7 +87,7 @@ export class NavigatorMeshesPanel extends NavigatorPanel
 
     GetName ()
     {
-        return Loc ('Meshes');
+    return Loc ('Parts');
     }
 
     GetIcon ()
@@ -254,13 +254,13 @@ export class NavigatorMeshesPanel extends NavigatorPanel
                 iconDiv : null
             },
             showHideMeshes : {
-                name : Loc ('Show/hide meshes'),
+                name : Loc ('Show/hide parts'),
                 icon : 'visible',
                 div : null,
                 iconDiv : null
             },
             fitToWindow : {
-                name : Loc ('Fit meshes to window'),
+                name : Loc ('Fit parts to window'),
                 icon : 'fit',
                 div : null,
                 iconDiv : null
@@ -480,10 +480,9 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         nodeItem.SetVisible (!nodeItem.IsVisible (), NavigatorItemRecurse.All);
     }
 
-    ToggleMeshVisibility (meshInstanceId)
-    {
-        let meshItem = this.GetMeshItem (meshInstanceId);
-        meshItem.SetVisible (!meshItem.IsVisible (), NavigatorItemRecurse.Parents);
+    ToggleMeshVisibility (meshInstanceId) {
+        let meshItem = this.GetMeshItem(meshInstanceId);
+        meshItem.SetVisible(!meshItem.IsVisible(), NavigatorItemRecurse.Parents);
     }
 
     IsMeshIsolated (meshInstanceId)

@@ -39,7 +39,7 @@ export class Embed
                 envMapName = environmentSettingsObj.environmentMapName;
                 bgIsEnvMap = environmentSettingsObj.backgroundIsEnvMap;
             }
-            let envMapPath = 'assets/envmaps/' + envMapName + '/';
+            let envMapPath = '/website/assets/envmaps/' + envMapName + '/';
             let envMapTextures = [
                 envMapPath + 'posx.jpg',
                 envMapPath + 'negx.jpg',

@@ -555,7 +555,11 @@ export class Navigation
 		let direction = SubCoord3D (this.camera.center, this.camera.eye);
 		let distance = direction.Length ();
 		let move = distance * ratio;
-		this.camera.eye.Offset (direction, move);
+		// Prevent camera.eye from matching center exactly
+		if (Math.abs(distance + move) < 1e-6) {
+			move = (move > 0 ? 1 : -1) * 1e-6;
+		}
+		this.camera.eye.Offset(direction, move);
 	}
 
 	Update ()

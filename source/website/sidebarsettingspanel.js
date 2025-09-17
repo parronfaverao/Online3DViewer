@@ -97,7 +97,7 @@ class EnvironmentMapPopup extends PopupDialog
             });
             for (let envMapImage of envMapImages) {
                 envMapImage.element = AddDomElement (contentDiv, 'img', 'ov_environment_map_preview');
-                envMapImage.element.setAttribute ('src', 'assets/envmaps/' + envMapImage.name + '.jpg');
+                envMapImage.element.setAttribute ('src', '/website/assets/envmaps/' + envMapImage.name + '.jpg');
                 let isSelected = false;
                 if (settings.backgroundIsEnvMap) {
                     isSelected = (envMapImage.name === settings.environmentMapName);
@@ -134,7 +134,7 @@ class EnvironmentMapPopup extends PopupDialog
 
             for (let envMapImage of envMapImages) {
                 envMapImage.element = AddDomElement (contentDiv, 'img', 'ov_environment_map_preview');
-                envMapImage.element.setAttribute ('src', 'assets/envmaps/' + envMapImage.name + '.jpg');
+                envMapImage.element.setAttribute ('src', '/website/assets/envmaps/' + envMapImage.name + '.jpg');
                 if (envMapImage.name === settings.environmentMapName) {
                     envMapImage.element.classList.add ('selected');
                 }
@@ -212,6 +212,8 @@ class SettingsModelDisplaySection extends SettingsSection
         this.thresholdSlider = null;
         this.thresholdSliderValue = null;
         this.edgeSettingsDiv = null;
+
+        this.environmentToggleDiv = AddDiv(this.contentDiv, 'ov_sidebar_parameter');
     }
 
     Init (callbacks)
@@ -306,7 +308,7 @@ class SettingsModelDisplaySection extends SettingsSection
     {
         function UpdateImage (input, image)
         {
-            input.style.backgroundImage = 'url(\'assets/envmaps/' + image + '.jpg\')';
+            input.style.backgroundImage = 'url(\'/website/assets/envmaps/' + image + '.jpg\')';
         }
 
         if (this.environmentMapPhongDiv !== null) {
