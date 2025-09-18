@@ -85,6 +85,23 @@ export class Toolbar {
     AddSeparator () {
         return AddDiv (this.mainDiv, 'ov_toolbar_separator');
     }
+    AddTextButton (text, textTitle, onClick) {
+        let buttonDiv = CreateDiv('ov_toolbar_button');
+        buttonDiv.textContent = text;
+        buttonDiv.setAttribute('alt', textTitle);
+        InstallTooltip(buttonDiv, textTitle);
+        buttonDiv.classList.add('ov_toolbar_text_button');
+        buttonDiv.addEventListener('click', () => {
+            onClick();
+        });
+        this.mainDiv.appendChild(buttonDiv);
+        // Return a minimal compatible interface
+        return {
+            AddClass: (className) => buttonDiv.classList.add(className),
+            RemoveClass: (className) => buttonDiv.classList.remove(className),
+            buttonDiv
+        };
+    }
     AddTextPushButton (text, textTitle, isSelected, onClick) {
         let buttonDiv = CreateDiv('ov_toolbar_button');
         buttonDiv.textContent = text;

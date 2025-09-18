@@ -2,7 +2,7 @@ import { Coord3D } from '../engine/geometry/coord3d.js';
 import { GetFileExtension, TransformFileHostUrls } from '../engine/io/fileutils.js';
 import { InputFilesFromFileObjects, InputFilesFromUrls } from '../engine/import/importerfiles.js';
 import { ImportErrorCode, ImportSettings } from '../engine/import/importer.js';
-import { NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
+import { Camera, NavigationMode, ProjectionMode } from '../engine/viewer/camera.js';
 import { RGBColor } from '../engine/model/color.js';
 import { Viewer } from '../engine/viewer/viewer.js';
 import { GetDefaultCamera } from '../engine/viewer/viewer.js';
@@ -699,7 +699,7 @@ export class Website
         this.viewer.SetBackgroundColor (this.settings.backgroundColor);
         this.viewer.SetNavigationMode (this.cameraSettings.navigationMode);
         this.viewer.SetProjectionMode (this.cameraSettings.projectionMode);
-        this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed);
+        this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed); // Restore normal zoom speed
         this.UpdateEnvironmentMap ();
 
         // Add long touch support for context menu (right-click) on touch devices
@@ -726,6 +726,12 @@ export class Website
         });
         canvas.addEventListener('touchmove', () => {
             clearTimeout(longTouchTimer);
+        });
+
+        // Add double-click support for fit model to window
+        canvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            this.FitModelToWindow(false);
         });
     }
 
@@ -755,6 +761,29 @@ export class Website
             } else {
                 button = toolbar.AddImagePushButton (imageName, imageTitle, false, (isSelected) => {
                     onClick (isSelected);
+                });
+            }
+            for (let className of classNames) {
+                button.AddClass (className);
+            }
+            return button;
+        }
+
+        function AddSimpleButton (toolbar, imageName, imageTitle, classNames, onClick)
+        {
+            let button;
+            // Use text label for view buttons (non-toggle)
+            if (imageName === 'front_view_text') {
+                button = toolbar.AddTextButton('FV', imageTitle, () => { onClick(); });
+            } else if (imageName === 'top_view_text') {
+                button = toolbar.AddTextButton('TV', imageTitle, () => { onClick(); });
+            } else if (imageName === 'side_view_text') {
+                button = toolbar.AddTextButton('SV', imageTitle, () => { onClick(); });
+            } else if (imageName === 'axo_view_text') {
+                button = toolbar.AddTextButton('AV', imageTitle, () => { onClick(); });
+            } else {
+                button = toolbar.AddImageButton (imageName, imageTitle, () => {
+                    onClick ();
                 });
             }
             for (let className of classNames) {
@@ -836,81 +865,101 @@ export class Website
         // Mutually exclusive view buttons
         const viewButtons = {};
         function deactivateAllViewButtons(except) {
-            for (const key in viewButtons) {
-                if (key !== except && viewButtons[key].IsSelected()) {
-                    viewButtons[key].SetSelected(false);
-                    setStandardView.call(this);
-                }
-            }
+            // Simple buttons don't have toggle state, so no deactivation needed
         }
 
-        // Front view (toggle, mutually exclusive)
-    viewButtons.front = AddPushButton(this.toolbar, 'front_view_text', Loc('Front view'), ['only_on_model'], (isSelected) => {
-            if (isSelected) {
+        // Front view (one-click to activate)
+    viewButtons.front = AddSimpleButton(this.toolbar, 'front_view_text', Loc('Front view'), ['only_on_model'], () => {
                 deactivateAllViewButtons.call(this, 'front');
-                previousCamera = this.viewer.navigation.GetCamera().Clone();
-                previousNavMode = this.viewer.GetNavigationMode();
                 let boundingSphere = this.viewer.GetBoundingSphere(() => true);
                 if (boundingSphere) {
+                    let currentCamera = this.viewer.navigation.GetCamera();
                     let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
                     let radius = boundingSphere.radius;
-                    let eye = new Coord3D(center.x - radius * 2.5, center.y, center.z);
+                    // Front view: camera rotated 90 degrees clockwise around Y-axis (for testing)
+                    let angle = -90 * Math.PI / 180; // Convert to radians, negative for clockwise
+                    let distance = radius * 3.0;
+                    let eye = new Coord3D(
+                        center.x + distance * Math.sin(angle),
+                        center.y,
+                        center.z - distance * Math.cos(angle)
+                    );
+                    console.log('Front View - Center:', center, 'Radius:', radius, 'Eye:', eye, 'Angle:', angle);
                     let up = new Coord3D(0, 1, 0);
-                    let fov = 45.0;
-                    let camera = { eye, center, up, fov };
-                    this.viewer.SetCamera(camera);
-                    if (this.viewer.SetUpVector) {
-                        this.viewer.SetUpVector(Direction.Y, false);
-                    }
-                    if (this.viewer.SetNavigationMode && this.cameraSettings) {
-                        this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
-                    }
+                    let camera = new Camera(eye, center, up, currentCamera.fov);
+                    console.log('Front View - New camera:', camera);
+                    this.viewer.navigation.MoveCamera(camera, 30); // Use MoveCamera with 30 animation steps for even slower animation
+                    console.log('Front View - Camera moved, current camera now:', this.viewer.navigation.GetCamera());
+                    // Temporarily commenting out SetUpVector and SetNavigationMode to test
+                    // if (this.viewer.SetUpVector) {
+                    //     this.viewer.SetUpVector(Direction.Y, false);
+                    //     console.log('Front View - SetUpVector called');
+                    // }
+                    // if (this.viewer.SetNavigationMode && this.cameraSettings) {
+                    //     this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
+                    //     console.log('Front View - SetNavigationMode called');
+                    // }
                 }
-            } else {
-                setStandardView.call(this);
-            }
         });
-        // Top view (toggle, mutually exclusive)
-    viewButtons.top = AddPushButton(this.toolbar, 'top_view_text', Loc('Top view'), ['only_on_model'], (isSelected) => {
-            if (isSelected) {
+        // Top view (one-click to activate)
+    viewButtons.top = AddSimpleButton(this.toolbar, 'top_view_text', Loc('Top view'), ['only_on_model'], () => {
                 deactivateAllViewButtons.call(this, 'top');
-                previousCamera = this.viewer.navigation.GetCamera().Clone();
-                previousNavMode = this.viewer.GetNavigationMode();
                 let boundingSphere = this.viewer.GetBoundingSphere(() => true);
                 if (boundingSphere) {
+                    let currentCamera = this.viewer.navigation.GetCamera();
                     let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
                     let radius = boundingSphere.radius;
-                    let eye = new Coord3D(center.x, center.y + radius * 2.5, center.z);
-                    let up = new Coord3D(1, 0, 0);
-                    let fov = 45.0;
-                    let camera = { eye, center, up, fov };
-                    this.viewer.SetCamera(camera);
-                    if (this.viewer.SetUpVector) {
-                        this.viewer.SetUpVector(Direction.Y, false);
-                    }
-                    if (this.viewer.SetNavigationMode && this.cameraSettings) {
-                        this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
-                    }
+                    // Top view: camera directly above, looking straight down along -Y axis, rotated 90 degrees clockwise
+                    let distance = radius * 3.0;
+                    let eye = new Coord3D(center.x, center.y + distance, center.z);
+                    console.log('Top View - Center:', center, 'Radius:', radius, 'Eye:', eye);
+                    // Rotate up vector 90 degrees clockwise around Y-axis for horizontal orientation
+                    // Original up was (0, 0, -1), rotated 90° clockwise becomes (1, 0, 0)
+                    let up = new Coord3D(1, 0, 0);  // X-axis as up for horizontal model orientation
+                    let camera = new Camera(eye, center, up, currentCamera.fov);
+                    console.log('Top View - New camera:', camera);
+                    this.viewer.navigation.MoveCamera(camera, 30); // Use MoveCamera with 30 animation steps for even slower animation
+                    console.log('Top View - Camera moved, current camera now:', this.viewer.navigation.GetCamera());
                 }
-            } else {
-                setStandardView.call(this);
-            }
         });
-        // Side view (toggle, mutually exclusive)
-    viewButtons.side = AddPushButton(this.toolbar, 'side_view_text', Loc('Side view'), ['only_on_model'], (isSelected) => {
-            if (isSelected) {
+        // Side view (one-click to activate)
+    viewButtons.side = AddSimpleButton(this.toolbar, 'side_view_text', Loc('Side view'), ['only_on_model'], () => {
                 deactivateAllViewButtons.call(this, 'side');
-                previousCamera = this.viewer.navigation.GetCamera().Clone();
-                previousNavMode = this.viewer.GetNavigationMode();
                 let boundingSphere = this.viewer.GetBoundingSphere(() => true);
                 if (boundingSphere) {
+                    let currentCamera = this.viewer.navigation.GetCamera();
                     let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
                     let radius = boundingSphere.radius;
-                    let eye = new Coord3D(center.x, center.y, center.z + radius * 2.5);
+                    // Side view: camera rotated -180 degrees around Y-axis to show actual side
+                    let angle = -180 * Math.PI / 180; // -180 degrees for side view
+                    let distance = radius * 3.0;
+                    let eye = new Coord3D(
+                        center.x + distance * Math.sin(angle),
+                        center.y,
+                        center.z - distance * Math.cos(angle)
+                    );
+                    console.log('Side View - Center:', center, 'Radius:', radius, 'Eye:', eye, 'Angle:', angle);
                     let up = new Coord3D(0, 1, 0);
-                    let fov = 45.0;
-                    let camera = { eye, center, up, fov };
-                    this.viewer.SetCamera(camera);
+                    let camera = new Camera(eye, center, up, currentCamera.fov);
+                    console.log('Side View - New camera:', camera);
+                    this.viewer.navigation.MoveCamera(camera, 30); // Use MoveCamera with 30 animation steps for even slower animation
+                    console.log('Side View - Camera moved, current camera now:', this.viewer.navigation.GetCamera());
+                }
+        });
+
+        // Axo view (one-click to activate - returns to default fitted view)
+    viewButtons.axo = AddSimpleButton(this.toolbar, 'axo_view_text', Loc('Axo view'), ['only_on_model'], () => {
+                deactivateAllViewButtons.call(this, 'axo');
+                let boundingSphere = this.viewer.GetBoundingSphere(() => true);
+                if (boundingSphere) {
+                    let currentCamera = this.viewer.navigation.GetCamera();
+                    let center = new Coord3D(boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
+                    let radius = boundingSphere.radius;
+                    // Upper-right-front axonometric view
+                    let eye = new Coord3D(center.x + radius * 1.5, center.y + radius * 2.0, center.z + radius * 3.0);
+                    let up = new Coord3D(0, 1, 0);
+                    let camera = new Camera(eye, center, up, currentCamera.fov);
+                    this.viewer.navigation.SetCamera(camera);
                     if (this.viewer.SetUpVector) {
                         this.viewer.SetUpVector(Direction.Y, false);
                     }
@@ -918,10 +967,8 @@ export class Website
                         this.viewer.SetNavigationMode(this.cameraSettings.navigationMode);
                     }
                 }
-            } else {
-                setStandardView.call(this);
-            }
         });
+
         // Mutually exclusive up vector/flip buttons
         const upButtons = {};
         function deactivateAllUpButtons(except) {
@@ -987,7 +1034,7 @@ export class Website
                 up = { x: 1, y: 0, z: 0 };
             }
             if (eye && up) {
-                let camera = { eye, center, up, fov };
+                let camera = new Camera(eye, center, up, fov);
                 this.viewer.SetCamera(camera);
                 // Keep up vector and navigation mode as in the original view
                 if (activeView === 'top') {
@@ -1170,7 +1217,7 @@ export class Website
             onZoomSpeedChanged : () => {
                 console.log('Website zoom speed callback triggered, new speed:', this.cameraSettings.zoomSpeed); // Debug log
                 this.cameraSettings.SaveToCookies ();
-                this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed);
+                this.viewer.SetZoomSpeed (this.cameraSettings.zoomSpeed); // Restore normal zoom speed
             },
             onResizeRequested : () => {
                 this.layouter.Resize ();

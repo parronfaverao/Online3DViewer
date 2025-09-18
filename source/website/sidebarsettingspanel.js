@@ -378,7 +378,7 @@ class SettingsCameraSection extends SettingsSection
 {
     constructor (parentDiv, cameraSettings)
     {
-        super (parentDiv, Loc ('Camera'), cameraSettings);
+        super (parentDiv, '', cameraSettings);
         this.cameraSettings = cameraSettings;
 
         this.zoomSpeedSlider = null;
@@ -389,37 +389,38 @@ class SettingsCameraSection extends SettingsSection
     {
         super.Init (callbacks);
 
-        // Zoom speed slider
-        let zoomSpeedRow = AddDiv (this.contentDiv, 'ov_sidebar_settings_row large');
-        AddDiv (zoomSpeedRow, null, Loc ('Zoom Speed'));
-        this.zoomSpeedSlider = AddRangeSlider (zoomSpeedRow, 0.1, 3.0);
-        this.zoomSpeedSlider.setAttribute ('title', Loc ('Zoom Speed'));
-        this.zoomSpeedSlider.setAttribute ('step', '0.1');
-        this.zoomSpeedSliderValue = AddDomElement (zoomSpeedRow, 'span', 'ov_slider_label');
+        // Zoom speed slider - HIDDEN FROM UI
+        // let zoomSpeedRow = AddDiv (this.contentDiv, 'ov_sidebar_settings_row large');
+        // AddDiv (zoomSpeedRow, null, Loc ('Zoom Speed'));
+        // this.zoomSpeedSlider = AddRangeSlider (zoomSpeedRow, 0.1, 3.0);
+        // this.zoomSpeedSlider.setAttribute ('title', Loc ('Zoom Speed'));
+        // this.zoomSpeedSlider.setAttribute ('step', '0.1');
+        // this.zoomSpeedSliderValue = AddDomElement (zoomSpeedRow, 'span', 'ov_slider_label');
 
-        this.zoomSpeedSlider.addEventListener ('input', () => {
-            this.zoomSpeedSliderValue.innerHTML = parseFloat(this.zoomSpeedSlider.value).toFixed(1) + 'x';
-        });
+        // this.zoomSpeedSlider.addEventListener ('input', () => {
+        //     this.zoomSpeedSliderValue.innerHTML = parseFloat(this.zoomSpeedSlider.value).toFixed(1) + 'x';
+        // });
 
-        this.zoomSpeedSlider.addEventListener ('change', () => {
-            this.cameraSettings.zoomSpeed = parseFloat(this.zoomSpeedSlider.value);
-            console.log('Zoom speed changed to:', this.cameraSettings.zoomSpeed); // Debug log
-            this.cameraSettings.SaveToCookies();
-            if (this.callbacks.onZoomSpeedChanged) {
-                this.callbacks.onZoomSpeedChanged();
-            }
-        });
+        // this.zoomSpeedSlider.addEventListener ('change', () => {
+        //     this.cameraSettings.zoomSpeed = parseFloat(this.zoomSpeedSlider.value);
+        //     console.log('Zoom speed changed to:', this.cameraSettings.zoomSpeed); // Debug log
+        //     this.cameraSettings.SaveToCookies();
+        //     if (this.callbacks.onZoomSpeedChanged) {
+        //         this.callbacks.onZoomSpeedChanged();
+        //     }
+        // });
 
-        this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
-        this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
+        // this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
+        // this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
     }
 
     Update ()
     {
-        if (this.zoomSpeedSlider !== null) {
-            this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
-            this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
-        }
+        // Zoom speed slider update - HIDDEN FROM UI
+        // if (this.zoomSpeedSlider !== null) {
+        //     this.zoomSpeedSlider.value = this.cameraSettings.zoomSpeed;
+        //     this.zoomSpeedSliderValue.innerHTML = this.cameraSettings.zoomSpeed.toFixed(1) + 'x';
+        // }
     }
 
     Clear ()

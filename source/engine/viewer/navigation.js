@@ -2,7 +2,7 @@ import { Coord2D, CoordDistance2D, SubCoord2D } from '../geometry/coord2d.js';
 import { CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D, AddCoord3D } from '../geometry/coord3d.js';
 import { DegRad, IsGreater, IsLower, IsZero } from '../geometry/geometry.js';
 import { ParabolicTweenFunction, TweenCoord3D } from '../geometry/tween.js';
-import { CameraIsEqual3D, NavigationMode } from './camera.js';
+import { Camera, CameraIsEqual3D, NavigationMode } from './camera.js';
 import { GetDomElementClientCoordinates } from './domutils.js';
 
 export class MouseInteraction
@@ -507,8 +507,8 @@ export class Navigation
 		let mouseX = params.clientX - rect.left;
 		let mouseY = params.clientY - rect.top;
 
-		// More responsive wheel handling - FIX: Remove negative sign to fix inverted scroll
-		let delta = params.deltaY;
+		// More responsive wheel handling - Invert mouse wheel direction only
+		let delta = -params.deltaY; // Invert wheel direction: wheel up = zoom in, wheel down = zoom out
 		let ratio = 0.2 * this.zoomSpeedMultiplier;
 
 		// Normalize different wheel modes (pixel, line, page)
